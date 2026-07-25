@@ -1,0 +1,93 @@
+[
+  {
+    "id": "support-hours",
+    "name": "Support Hours",
+    "category": "Support",
+    "expected": "Agent should state that support is available Monday through Friday, 8 AM to 6 PM Eastern",
+    "kb_expect": ["Monday", "6:00 PM"],
+    "variants": [
+      {"turns": ["What are your support hours?"]},
+      {"turns": ["When is your help desk open?"]},
+      {"turns": ["What time does support close?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["8 AM", "8:00 AM"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "billing-dispute",
+    "name": "Billing Dispute Routing",
+    "category": "Routing",
+    "expected": "Agent should empathize and route the caller to the billing team to review the charge; it must not adjudicate the dispute itself",
+    "variants": [
+      {"turns": ["I have a problem with my invoice."]},
+      {"turns": ["There's a wrong charge on my bill."]},
+      {"turns": ["Who do I talk to about a billing issue?"]}
+    ],
+    "graders": [
+      {"type": "forbidden", "any": ["charges are final", "no refunds"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "warranty",
+    "name": "Warranty Coverage",
+    "category": "Products",
+    "expected": "Agent should state that standard hardware warranty covers parts and labor for three years from purchase date, and offer to check a specific device by serial number",
+    "kb_expect": ["three years"],
+    "variants": [
+      {"turns": ["Is my laptop still under warranty?"]},
+      {"turns": ["What does the warranty cover?"]},
+      {"turns": ["How long is the warranty period?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["three years", "3 years"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "escalation",
+    "name": "Escalate to Technician",
+    "category": "Routing",
+    "expected": "Agent should acknowledge the request and escalate to field services to schedule an on-site visit",
+    "variants": [
+      {"turns": ["I need a technician on site."]},
+      {"turns": ["Can someone come fix our server?"]},
+      {"turns": ["This needs a field tech."]}
+    ],
+    "graders": [
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "password-reset",
+    "name": "Password Reset",
+    "category": "Support",
+    "expected": "Agent should explain that password resets are self-serve via the 'Forgot password' link on the client portal login page, and offer to walk the caller through it",
+    "kb_expect": ["Forgot password"],
+    "variants": [
+      {"turns": ["I forgot my password."]},
+      {"turns": ["How do I reset my password?"]},
+      {"turns": ["I'm locked out of my account."]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["forgot password", "reset"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "order-status",
+    "name": "Order Status",
+    "category": "Orders",
+    "expected": "Agent should not invent tracking details; order status is account-specific, so it should route the caller to the orders team",
+    "variants": [
+      {"turns": ["Where's my order?"]},
+      {"turns": ["Can you check on my shipment?"]},
+      {"turns": ["Has my equipment shipped yet?"]}
+    ],
+    "graders": [
+      {"type": "judge"}
+    ]
+  }
+]

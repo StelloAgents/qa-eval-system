@@ -3,6 +3,7 @@ import {
   EvalOrg,
   EvalResult,
   EvalRun,
+  OrgCases,
   RunStatusResponse,
   RunTier,
 } from "./types";
@@ -19,6 +20,7 @@ async function getJson<T>(url: string): Promise<T> {
 export const api = {
   listOrgs: () => getJson<EvalOrg[]>("/api/orgs"),
   getOrg: (orgId: string) => getJson<EvalOrg>(`/api/orgs/${orgId}`),
+  getOrgCases: (orgId: string) => getJson<OrgCases>(`/api/orgs/${orgId}/cases`),
   listRuns: (orgId: string, limit = 10) =>
     getJson<EvalRun[]>(`/api/evals/runs/${orgId}?limit=${limit}`),
   getRun: (runId: string) => getJson<RunStatusResponse>(`/api/evals/run/${runId}`),

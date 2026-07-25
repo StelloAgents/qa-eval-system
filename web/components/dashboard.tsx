@@ -361,7 +361,12 @@ export function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">By Category</CardTitle>
-            <CardDescription>Latest run pass rate per category</CardDescription>
+            <CardDescription>
+              Latest run pass rate per category ·{" "}
+              <Link href={`/cases?org=${orgId}`} className="hover:underline">
+                view test cases →
+              </Link>
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {!results ? (

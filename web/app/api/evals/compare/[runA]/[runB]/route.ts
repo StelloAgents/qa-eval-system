@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { compareRuns } from "@/lib/mock-data";
+import { compareRuns } from "@/lib/db";
 
 // GET /api/evals/compare/:run_id_a/:run_id_b — A is the baseline, B the
 // current run (SPEC.md). Returns new_passes / regressions / stable.

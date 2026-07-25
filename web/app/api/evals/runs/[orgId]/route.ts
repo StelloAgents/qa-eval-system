@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listRuns } from "@/lib/mock-data";
+import { listRuns } from "@/lib/db";
 
 // GET /api/evals/runs/:org_id?limit=10 — run history (SPEC.md).
 export async function GET(
@@ -7,6 +7,5 @@ export async function GET(
   { params }: { params: { orgId: string } }
 ) {
   const limit = Number(req.nextUrl.searchParams.get("limit") ?? 10);
-  const runs = listRuns(params.orgId, Number.isFinite(limit) ? limit : 10);
-  return NextResponse.json(runs);
+  return NextResponse.json(listRuns(params.orgId, Number.isFinite(limit) ? limit : 10));
 }

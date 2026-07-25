@@ -1,0 +1,381 @@
+[
+  {
+    "id": "mascot",
+    "name": "Team Mascot",
+    "category": "Team Knowledge",
+    "expected": "Agent answers TORO, the blue bull.",
+    "kb_expect": ["Toro"],
+    "variants": [
+      {"turns": ["Who is the Texans mascot?"]},
+      {"turns": ["whats the mascots name"]},
+      {"turns": ["Do the Texans have a mascot?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["Toro"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "alcohol-cutoff",
+    "name": "Alcohol Cutoff Time",
+    "category": "Stadium Policy",
+    "expected": "Alcohol and liquor sales end after the 3rd quarter.",
+    "kb_expect": ["3rd quarter"],
+    "variants": [
+      {"turns": ["What time do they stop selling alcohol during a game?"]},
+      {"turns": ["whens last call for beer at the stadium"]},
+      {"turns": ["How late can I buy a drink at the game?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["3rd quarter", "third quarter"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "rideshare-pickup",
+    "name": "Rideshare Pickup Locations",
+    "category": "Stadium Policy",
+    "expected": "The rideshare and taxi pick-up and drop-off location is in Yellow Lot 35.",
+    "kb_expect": ["Yellow Lot 35"],
+    "variants": [
+      {"turns": ["Where do I get picked up for an Uber after the game?"]},
+      {"turns": ["wheres the uber pickup spot"]},
+      {"turns": ["What's the rideshare situation at the stadium?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["Yellow Lot 35", "Lot 35"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "cowboys-game",
+    "name": "Specific Game Questions - Cowboys",
+    "category": "Schedule",
+    "expected": "Regular Season Week 4: Sunday, October 4th at 12:00 PM CT. Home Game against the Dallas Cowboys. Game Theme: 25th Season, presented by Reliant.",
+    "kb_expect": ["October 4"],
+    "variants": [
+      {"turns": ["Can you tell me more about the Cowboys game?"]},
+      {"turns": ["when do we play dallas"]},
+      {"turns": ["What time is the Texans Cowboys game and is it at home?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["October 4", "October 4th", "Oct 4", "Oct. 4"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "training-camp",
+    "name": "When Is Training Camp",
+    "category": "Schedule",
+    "expected": "Agent explains training camp tickets go on sale Wednesday, July 8th for season ticket members, and Thursday, July 9th for non-season ticket members.",
+    "kb_expect": ["July 8"],
+    "variants": [
+      {"turns": ["When is training camp?"]},
+      {"turns": ["when does training camp start"]},
+      {"turns": ["How do I get in to see training camp this summer?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["July 8", "July 8th"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "digital-tickets",
+    "name": "Accessing Digital Tickets",
+    "category": "Ticket Access",
+    "expected": "Agent explains all tickets are available in the Houston Texans app and gives instructions on how to view the tickets in the app.",
+    "kb_expect": ["Texans app"],
+    "variants": [
+      {"turns": ["How do I receive and access my digital tickets?"]},
+      {"turns": ["where are my digital tickets"]},
+      {"turns": ["I can't figure out how to pull up my tickets on my phone"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["app"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "update-credit-card",
+    "name": "Add or Update Credit Card",
+    "category": "Account Management",
+    "expected": "Agent explains this is handled through the Texans account manager and provides the steps to get there.",
+    "kb_expect": ["account manager"],
+    "variants": [
+      {"turns": ["How do I add or update my credit card?"]},
+      {"turns": ["i need to change the card on file"]},
+      {"turns": ["My credit card expired, where do I put the new one in?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["account manager"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "invoice-balance",
+    "name": "View Invoice Balance",
+    "category": "Account Management",
+    "expected": "Agent explains season ticket members can view their balance in the Houston Texans account manager.",
+    "kb_expect": ["account manager"],
+    "variants": [
+      {"turns": ["How can I see my invoice balance?"]},
+      {"turns": ["how much do i still owe"]},
+      {"turns": ["Where do I check what's left on my invoice?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["account manager"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "away-game-tickets",
+    "name": "Buying Away Game Tickets",
+    "category": "Tickets",
+    "expected": "Agent explains all season tickets and single-game tickets, both home and away, can be bought through Ticketmaster or the NFL Ticket Exchange.",
+    "kb_expect": ["Ticketmaster"],
+    "variants": [
+      {"turns": ["How can I buy tickets for away games?"]},
+      {"turns": ["can i get tickets for a road game"]},
+      {"turns": ["I want to see the Texans play in another city, how do I get seats?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["Ticketmaster", "NFL Ticket Exchange"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "member-gift",
+    "name": "2026 Season Ticket Member Gift",
+    "category": "Membership",
+    "expected": "Agent explains the gifting platform for the season is already closed and offers to connect the caller with membership services.",
+    "variants": [
+      {"turns": ["Will I receive a 2026 season ticket member gift?"]},
+      {"turns": ["am i getting my member gift this year"]},
+      {"turns": ["Hey, what's the deal with the season ticket holder gift for 2026?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["closed"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "ticket-barcode",
+    "name": "Barcode on Ticket",
+    "category": "Ticket Access",
+    "expected": "Agent explains that a ticket without a barcode is not invalid; barcodes usually appear closer to game day.",
+    "kb_expect": ["barcode"],
+    "variants": [
+      {"turns": ["Should there be a barcode on my ticket?"]},
+      {"turns": ["my ticket doesnt have a barcode on it, is it fake"]},
+      {"turns": ["I'm looking at my ticket in the app and there's no scan code. Is something wrong?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["closer to game day", "game day"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "cannot-attend",
+    "name": "Cannot Attend a Game - Options",
+    "category": "Tickets",
+    "expected": "Agent gives three options: (1) transfer or sell the tickets through the Texans app, (2) send tickets to friends or family by transferring them, and (3) donate tickets to local charity and community organizations through the Texans.",
+    "kb_expect": ["donate"],
+    "variants": [
+      {"turns": ["What if I can't attend a game?"]},
+      {"turns": ["i cant make it to the game next week what are my options"]},
+      {"turns": ["Something came up and I'm going to miss a home game. What can I do with my seats?"]}
+    ],
+    "graders": [
+      {"type": "contains", "all": ["transfer", "donate"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "change-payment-plan",
+    "name": "Change Payment Plan",
+    "category": "Payments",
+    "expected": "Agent offers to connect the caller with the membership services team to change their payment plan.",
+    "variants": [
+      {"turns": ["Can I change my payment plan?"]},
+      {"turns": ["i want to switch my payment plan"]},
+      {"turns": ["Is it possible to move to a different payment schedule for my season tickets?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["membership services"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "child-seat-stroller",
+    "name": "Child Seat Plus Stroller (Multi-Turn)",
+    "category": "Stadium Policy",
+    "expected": "Children under 2 sit on a parent's lap and do not need a seat (age 2 and older requires a ticket). Strollers are allowed but must be checked at a Guest Experience booth.",
+    "kb_expect": ["stroller"],
+    "variants": [
+      {"turns": ["Does my 2-year-old need their own seat?", "And can I bring the stroller in?"]},
+      {"turns": ["do i need a ticket for my toddler", "what about a stroller"]},
+      {"turns": ["I'm bringing my two year old to the game, does she need a ticket?", "Can I bring her stroller into the stadium?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["Guest Experience"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "home-schedule",
+    "name": "Find Home Schedule",
+    "category": "Schedule",
+    "expected": "Agent explains the schedule can be found on the Texans app and on the Texans website under Schedule, and offers to answer any further questions about it.",
+    "variants": [
+      {"turns": ["Where can I find the Texans home schedule?"]},
+      {"turns": ["where do i see the home games this year"]},
+      {"turns": ["How do I look up when the Texans play at home?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["app", "website"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "make-payment",
+    "name": "Make a Payment on Account",
+    "category": "Payments",
+    "expected": "Agent offers to connect the caller with the membership services team.",
+    "variants": [
+      {"turns": ["I need to make a payment on my account."]},
+      {"turns": ["i wanna pay my bill"]},
+      {"turns": ["Can I pay off my season ticket balance over the phone?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["membership services"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "payment-due",
+    "name": "Next Payment Due Date",
+    "category": "Payments",
+    "expected": "Agent computes the next payment date from today's date using the schedule: payments are due the 15th of each month (February the 13th). The 4-month plan runs Feb-May, final deadline May 15. The 8-month plan runs Feb-Sep, final deadline Sep 15. If today is on or before the 15th, this month's payment is the next one due and must NOT roll to the following month; only if today is past the 15th does it roll forward. If today is past a plan's final deadline, that plan is fully paid up. Where the caller has not said which plan they are on, naming the date for each plan is acceptable, as is offering to connect them with membership services for plan-specific detail. The agent must not state a due date that contradicts today's date.",
+    "variants": [
+      {"turns": ["When is my next payment due?"]},
+      {"turns": ["when do i owe my next payment"]},
+      {"turns": ["What's the due date on my next installment?"]},
+      {"turns": ["I'm on the 8 month plan. When exactly is my next payment due?"], "plan": "8"},
+      {"turns": ["im on the 4 month plan, when do i pay next"], "plan": "4"}
+    ],
+    "graders": [
+      {"type": "payment_due"},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "opt-out",
+    "name": "Opt Out of Season Tickets",
+    "category": "Membership",
+    "expected": "Agent explains the opt-out period has passed. To opt out for the 2027 season, the caller will need to submit an opt-out form when the 2027 invoices are sent.",
+    "kb_expect": ["2027"],
+    "variants": [
+      {"turns": ["How can I opt out of my season tickets?"]},
+      {"turns": ["i want to cancel my season tickets"]},
+      {"turns": ["I don't want to renew my seats. How do I get out?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["2027"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "preseason-included",
+    "name": "Preseason Tickets Included",
+    "category": "Membership",
+    "expected": "Agent confirms preseason tickets are included with all full season ticket memberships, and notes the NFL uses dynamic pricing so ticket prices can vary by game.",
+    "kb_expect": ["preseason"],
+    "variants": [
+      {"turns": ["As a season ticket member, are my preseason tickets included in the package?"]},
+      {"turns": ["do i get preseason games with my season tickets"]},
+      {"turns": ["Does my membership cover the preseason games too?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["included"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "relocate-seats",
+    "name": "Relocate or Add Seats or Parking",
+    "category": "Membership",
+    "expected": "Agent offers to connect the caller with the membership services team.",
+    "variants": [
+      {"turns": ["How do I relocate or add on seats or parking for the 2026 season?"]},
+      {"turns": ["can i move my seats for next season"]},
+      {"turns": ["I'd like to add a parking pass and maybe change where I'm sitting."]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["membership services"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "apple-wallet",
+    "name": "Save Tickets to Apple Wallet",
+    "category": "Ticket Access",
+    "expected": "Agent recommends saving tickets to Apple Wallet, but notes tickets can only be saved to one wallet at a time.",
+    "kb_expect": ["Apple Wallet"],
+    "variants": [
+      {"turns": ["Should I save my tickets to my Apple Wallet?"]},
+      {"turns": ["can i put my tickets in apple wallet"]},
+      {"turns": ["Is it a good idea to add my tickets to my phone's wallet?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["one wallet", "one device", "only be saved to one"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "transfer-ownership",
+    "name": "Transfer Membership Ownership",
+    "category": "Membership",
+    "expected": "Agent explains the Texans allow PSL transfers year-round, but the account must be current on the season ticket payments assigned for the season or the transfer will not be completed, the account must be current to post any seats for sale, and the PSL must be paid in full or the transfer will be declined. Agent offers to connect the caller with membership services for additional details.",
+    "kb_expect": ["PSL"],
+    "variants": [
+      {"turns": ["How can I transfer ownership of my membership?"]},
+      {"turns": ["can i put my season tickets in someone elses name"]},
+      {"turns": ["My father wants to hand his seats down to me. How does that work?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["PSL"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "tickets-available-manage",
+    "name": "When 2026 Tickets Available to Manage",
+    "category": "Ticket Access",
+    "expected": "Agent explains the caller can start managing tickets digitally now. Each season, tickets are released in the Houston Texans app once the NFL schedule is released, usually around the second week of May.",
+    "kb_expect": ["May"],
+    "variants": [
+      {"turns": ["When will my 2026 tickets be available to manage?"]},
+      {"turns": ["when do my tickets show up in the app"]},
+      {"turns": ["At what point can I start moving my 2026 tickets around?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["May"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "free-tickets-deflection",
+    "name": "Free Tickets Plus Off-Topic Deflection",
+    "category": "Guardrails",
+    "expected": "Agent states the Texans do not provide free tickets, and politely declines the off-topic Cowboys score question, steering back to Texans help. Agent does not invent a score.",
+    "variants": [
+      {"turns": ["Can you hook me up with some free tickets?", "Oh, and what's the Cowboys score right now?"]},
+      {"turns": ["any chance of comp tickets", "also whats the cowboys score"]},
+      {"turns": ["Do you ever give out free tickets to fans?", "By the way, do you know the score of the Cowboys game right now?"]}
+    ],
+    "graders": [
+      {"type": "forbidden_regex", "pattern": "\\b\\d{1,2}\\s*[-–]\\s*\\d{1,2}\\b", "scope": "last_turn"},
+      {"type": "judge"}
+    ]
+  }
+]

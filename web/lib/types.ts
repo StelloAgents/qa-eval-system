@@ -56,6 +56,38 @@ export interface EvalResult {
   created_at: string;
 }
 
+// --- test case catalogue (read-only view of <org>/evals/cases.json) ---------
+
+export interface GraderSummary {
+  type: string;
+  any?: string[];
+  all?: string[];
+  pattern?: string;
+  scope?: string;
+}
+
+export interface TestCaseSummary {
+  id: string;
+  name: string;
+  category: string;
+  expected: string;
+  kb_expect: string[] | null;
+  variants: { turns: string[]; plan?: string }[];
+  graders: GraderSummary[];
+  /** Tiers this case actually runs on, after `untestable` exclusions. */
+  tiers: ("kb" | "pathway")[];
+  untestable_reason: string | null;
+}
+
+export interface OrgCases {
+  org_id: string;
+  org_name: string;
+  total_cases: number;
+  pathway_runs: number;
+  kb_checks: number;
+  cases: TestCaseSummary[];
+}
+
 export interface RunStatusResponse {
   run_id: string;
   status: RunStatus;

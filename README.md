@@ -145,11 +145,9 @@ Or pass via CLI flags.
 ## Web UI
 
 A Next.js dashboard for running evals and browsing results lives in `web/`
-(dark theme, Tailwind + shadcn/ui). It currently runs on **mock data** — the
-API routes mirror SPEC.md exactly (`POST /api/evals/run`, `GET /api/evals/run/:id`,
-`/results`, `/api/evals/runs/:org`, `/api/evals/compare/:a/:b`, `/api/orgs/:org`),
-so swapping in Supabase + the real Bland/OpenRouter runner later only touches
-`web/lib/mock-data.ts` and the route handlers.
+(dark theme, Tailwind + shadcn/ui). It runs **live**: clicking "Run Evals"
+executes the same two-tier eval as `eval.py` against the real Bland and
+OpenRouter APIs (`web/lib/runner/`) and stores every result.
 
 ```bash
 cd web
@@ -157,10 +155,46 @@ npm install
 npm run dev    # http://localhost:3000
 ```
 
+The dashboard reads the same repo-root `.env` as `eval.py`, so no separate
+config is needed. Per-org keys are resolved through the org's
+`bland_api_key_env` column (e.g. `BLAND_API_KEY_TEXANS`), falling back to
+`BLAND_API_KEY`.
+
+### Storage
+
+Results persist to SQLite at `web/data/qa-eval.db` (gitignored, created on
+first use) using the exact `eval_orgs` / `eval_runs` / `eval_results` schema
+from SPEC.md, so the Supabase migration is a driver swap in `web/lib/db.ts`.
+Org config is seeded on first run; Compugen ships inactive until its pathway
+exists.
+
+Runs execute in the background of the Node server and the UI polls for
+progress. That works for `next dev`/`next start`; a serverless deploy needs a
+queue instead (see SPEC.md roadmap).
+
+### API routes
+
+All routes mirror SPEC.md §API Endpoints:
+
+| Route | Purpose |
+|---|---|
+| `POST /api/evals/run` | trigger a run — `{ org_id, tier }` |
+| `GET /api/evals/run/:id` | poll status + live progress |
+| `GET /api/evals/run/:id/results` | per-case results |
+| `GET /api/evals/runs/:org?limit=` | run history |
+| `GET /api/evals/compare/:a/:b` | regressions vs. baseline A |
+| `GET /api/orgs`, `GET /api/orgs/:org` | org config (never returns keys) |
+| `PUT /api/orgs/:org` | `{ bland_api_key_env?, is_active? }` |
+| `GET /api/orgs/:org/cases` | the org's test case catalogue |
+
 Pages:
 - **Dashboard** (`/`) — org selector, tier picker, Run Evals button with live
   progress, last-run summary, regression comparison vs. previous run, category
   breakdown, recent runs.
+- **Test cases** (`/cases`) — every scenario the selected org is graded on:
+  expected outcome, all prompt phrasings, KB assertions, and which graders
+  apply. Read live from `<org>/evals/cases.json`, so it cannot drift from what
+  the runner actually executes. Searchable by prompt text.
 - **Run results** (`/runs/[runId]`) — filterable pass/fail table; click a row
   for the full transcript and grader notes.
 - **Run history** (`/history`) — last 10 runs per org with two-run compare.
