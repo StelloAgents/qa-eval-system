@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --card: 224 55% 7%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 224 55% 7%;
+    --popover-foreground: 215 25% 89%;
+
+    --primary: 210 100% 60%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 213 31% 91%;
+
+    --muted: 223 30% 14%;
+    --muted-foreground: 215 16% 57%;
+
+    --accent: 222 30% 16%;
+    --accent-foreground: 213 31% 91%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 25% 17%;
+    --input: 222 25% 17%;
+    --ring: 210 100% 60%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Subtle grid backdrop for the dashboard shell */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, hsl(222 25% 17% / 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(222 25% 17% / 0.35) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.bg-glow {
+  background: radial-gradient(
+    ellipse 60% 40% at 50% 0%,
+    hsl(210 100% 60% / 0.12),
+    transparent 70%
+  );
+}

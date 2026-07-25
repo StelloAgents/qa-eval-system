@@ -142,6 +142,29 @@ Or pass via CLI flags.
      --bland-api-key "sk-bland-..."
    ```
 
+## Web UI
+
+A Next.js dashboard for running evals and browsing results lives in `web/`
+(dark theme, Tailwind + shadcn/ui). It currently runs on **mock data** — the
+API routes mirror SPEC.md exactly (`POST /api/evals/run`, `GET /api/evals/run/:id`,
+`/results`, `/api/evals/runs/:org`, `/api/evals/compare/:a/:b`, `/api/orgs/:org`),
+so swapping in Supabase + the real Bland/OpenRouter runner later only touches
+`web/lib/mock-data.ts` and the route handlers.
+
+```bash
+cd web
+npm install
+npm run dev    # http://localhost:3000
+```
+
+Pages:
+- **Dashboard** (`/`) — org selector, tier picker, Run Evals button with live
+  progress, last-run summary, regression comparison vs. previous run, category
+  breakdown, recent runs.
+- **Run results** (`/runs/[runId]`) — filterable pass/fail table; click a row
+  for the full transcript and grader notes.
+- **Run history** (`/history`) — last 10 runs per org with two-run compare.
+
 ## Architecture
 
 ```

@@ -38,3 +38,9 @@ Thumbs.db
 
 # Results (gitignored but created locally)
 results/
+
+# Web UI (Next.js)
+node_modules/
+.next/
+# root Python ignore has a bare `lib/` pattern; the web app's lib/ is source
+!web/lib/
