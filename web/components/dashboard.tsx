@@ -43,6 +43,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PassRateRing } from "@/components/pass-rate-ring";
 import { StatusBadge, TierBadge } from "@/components/badges";
+import { ModelPicker } from "@/components/model-picker";
 
 const TIER_OPTIONS: { value: RunTier; label: string }[] = [
   { value: "kb", label: "KB only" },
@@ -241,6 +242,8 @@ export function Dashboard() {
           </div>
         )}
       </Card>
+
+      <ModelPicker orgId={orgId} />
 
       {/* Summary row */}
       <div className="grid gap-6 lg:grid-cols-2">

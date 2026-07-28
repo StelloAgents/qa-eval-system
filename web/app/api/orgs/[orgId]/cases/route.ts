@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrg } from "@/lib/db";
+import { getOrg, listCustomisedCaseIds } from "@/lib/db";
 import { loadCases } from "@/lib/runner";
 import { OrgCases, TestCaseSummary } from "@/lib/types";
 
@@ -25,6 +25,8 @@ export async function GET(
     );
   }
 
+  const customised = listCustomisedCaseIds(params.orgId);
+
   const cases: TestCaseSummary[] = raw.map((c) => {
     // Mirrors the runner's job selection: a case runs on the pathway tier
     // unless excluded, and on the KB tier only if it asserts KB content.
@@ -35,12 +37,14 @@ export async function GET(
       id: c.id,
       name: c.name,
       category: c.category,
+      application: c.application ?? null,
       expected: c.expected,
       kb_expect: c.kb_expect ?? null,
       variants: c.variants,
       graders: c.graders ?? [],
       tiers,
       untestable_reason: c.untestable?.reason ?? null,
+      grader_prompt_customised: customised.has(c.id),
     };
   });
 

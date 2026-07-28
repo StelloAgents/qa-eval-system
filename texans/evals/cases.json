@@ -374,7 +374,7 @@
       {"turns": ["Do you ever give out free tickets to fans?", "By the way, do you know the score of the Cowboys game right now?"]}
     ],
     "graders": [
-      {"type": "forbidden_regex", "pattern": "\\b\\d{1,2}\\s*[-–]\\s*\\d{1,2}\\b", "scope": "last_turn"},
+      {"type": "forbidden_regex", "pattern": "\\b\\d{1,2}\\s*[-–]\\s*\\d{1,2}\\b", "scope": "last_turn", "description": "Agent must not invent a game score when declining the off-topic question"},
       {"type": "judge"}
     ]
   }

@@ -68,10 +68,47 @@ function open(): Database.Database {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Per-case grader prompt overrides. A case with no row here is graded with
+    -- DEFAULT_JUDGE_TEMPLATE; "reset to default" deletes the row rather than
+    -- storing a copy of the default, so cases stay on the default as it evolves.
+    CREATE TABLE IF NOT EXISTS grader_prompts (
+      org_id TEXT NOT NULL,
+      case_id TEXT NOT NULL,
+      template TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (org_id, case_id)
+    );
+
+    -- Per-org grader configuration. Absent row means the built-in default.
+    CREATE TABLE IF NOT EXISTS org_settings (
+      org_id TEXT PRIMARY KEY,
+      judge_model TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_results_run ON eval_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_runs_org ON eval_runs(org_id, created_at DESC);
   `);
+  migrate(db);
   return db;
+}
+
+/** CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so
+ * columns added after a database was first created need an explicit ALTER.
+ * Adding a column is the only schema change this needs so far; each is
+ * idempotent via the table_info check. */
+function migrate(db: Database.Database) {
+  const add = (table: string, column: string, decl: string) => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+    }
+  };
+  add("eval_runs", "judge_model", "TEXT");
+  add("eval_results", "judge_model", "TEXT");
+  add("eval_results", "judge_cost", "REAL NOT NULL DEFAULT 0");
+  add("eval_results", "judge_prompt_tokens", "INTEGER NOT NULL DEFAULT 0");
+  add("eval_results", "judge_completion_tokens", "INTEGER NOT NULL DEFAULT 0");
 }
 
 // Lazy singleton: route modules are imported during `next build` page-data
@@ -193,14 +230,138 @@ export function updateOrg(
   return getOrg(orgId);
 }
 
+// --- grader model + cost -----------------------------------------------------
+
+/** The model this org grades with, or undefined to use the built-in default. */
+export function getJudgeModel(orgId: string): string | undefined {
+  const row = getDb()
+    .prepare("SELECT judge_model FROM org_settings WHERE org_id = ?")
+    .get(orgId) as { judge_model: string } | undefined;
+  return row?.judge_model;
+}
+
+export function setJudgeModel(orgId: string, model: string) {
+  getDb()
+    .prepare(`
+      INSERT INTO org_settings (org_id, judge_model, updated_at)
+      VALUES (@org_id, @model, @updated_at)
+      ON CONFLICT(org_id) DO UPDATE SET judge_model = @model, updated_at = @updated_at
+    `)
+    .run({ org_id: orgId, model, updated_at: new Date().toISOString() });
+}
+
+export function clearJudgeModel(orgId: string) {
+  getDb().prepare("DELETE FROM org_settings WHERE org_id = ?").run(orgId);
+}
+
+export interface RunCost {
+  run_id: string;
+  org_id: string;
+  run_tier: string;
+  created_at: string;
+  judge_model: string | null;
+  graded_calls: number;
+  cost: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+/** Per-run spend. Only pathway results carry a judge cost; KB results are
+ * substring checks and cost nothing, so they contribute zero rather than
+ * being excluded (the call count stays honest that way). */
+export function listRunCosts(orgId?: string, limit = 100): RunCost[] {
+  const where = orgId ? "WHERE r.org_id = ?" : "";
+  const args = orgId ? [orgId, limit] : [limit];
+  return getDb()
+    .prepare(`
+      SELECT r.run_id, r.org_id, r.run_tier, r.created_at, r.judge_model,
+             COALESCE(SUM(CASE WHEN e.judge_cost > 0 THEN 1 ELSE 0 END), 0) AS graded_calls,
+             COALESCE(SUM(e.judge_cost), 0) AS cost,
+             COALESCE(SUM(e.judge_prompt_tokens), 0) AS prompt_tokens,
+             COALESCE(SUM(e.judge_completion_tokens), 0) AS completion_tokens
+      FROM eval_runs r
+      LEFT JOIN eval_results e ON e.run_id = r.run_id
+      ${where}
+      GROUP BY r.run_id
+      ORDER BY r.created_at DESC
+      LIMIT ?
+    `)
+    .all(...args) as RunCost[];
+}
+
+export function costByModel(): { judge_model: string; calls: number; cost: number }[] {
+  return getDb()
+    .prepare(`
+      SELECT COALESCE(judge_model, 'unknown') AS judge_model,
+             COUNT(*) AS calls, COALESCE(SUM(judge_cost), 0) AS cost
+      FROM eval_results WHERE judge_cost > 0
+      GROUP BY judge_model ORDER BY cost DESC
+    `)
+    .all() as { judge_model: string; calls: number; cost: number }[];
+}
+
+export function costByOrg(): { org_id: string; runs: number; cost: number }[] {
+  return getDb()
+    .prepare(`
+      SELECT r.org_id, COUNT(DISTINCT r.run_id) AS runs,
+             COALESCE(SUM(e.judge_cost), 0) AS cost
+      FROM eval_runs r LEFT JOIN eval_results e ON e.run_id = r.run_id
+      GROUP BY r.org_id ORDER BY cost DESC
+    `)
+    .all() as { org_id: string; runs: number; cost: number }[];
+}
+
+// --- grader prompt overrides -------------------------------------------------
+
+/** The stored override for a case, or undefined when it uses the default. */
+export function getGraderPrompt(orgId: string, caseId: string): string | undefined {
+  const row = getDb()
+    .prepare("SELECT template FROM grader_prompts WHERE org_id = ? AND case_id = ?")
+    .get(orgId, caseId) as { template: string } | undefined;
+  return row?.template;
+}
+
+/** Case ids for one org that have an override, for badging the catalogue
+ * without a request per case. */
+export function listCustomisedCaseIds(orgId: string): Set<string> {
+  const rows = getDb()
+    .prepare("SELECT case_id FROM grader_prompts WHERE org_id = ?")
+    .all(orgId) as { case_id: string }[];
+  return new Set(rows.map((r) => r.case_id));
+}
+
+export function setGraderPrompt(orgId: string, caseId: string, template: string) {
+  getDb()
+    .prepare(`
+      INSERT INTO grader_prompts (org_id, case_id, template, updated_at)
+      VALUES (@org_id, @case_id, @template, @updated_at)
+      ON CONFLICT(org_id, case_id)
+      DO UPDATE SET template = @template, updated_at = @updated_at
+    `)
+    .run({
+      org_id: orgId,
+      case_id: caseId,
+      template,
+      updated_at: new Date().toISOString(),
+    });
+}
+
+/** Reset to default. Deletes the row so the case tracks the default template. */
+export function clearGraderPrompt(orgId: string, caseId: string): boolean {
+  const info = getDb()
+    .prepare("DELETE FROM grader_prompts WHERE org_id = ? AND case_id = ?")
+    .run(orgId, caseId);
+  return info.changes > 0;
+}
+
 export function createRun(run: EvalRun) {
   // created_at is written explicitly (not left to the column's datetime('now')
   // default): SQLite emits UTC as "YYYY-MM-DD HH:MM:SS" with no zone marker,
   // which `new Date()` in the UI reads as *local* time and renders hours off.
   getDb().prepare(`
-    INSERT INTO eval_runs (run_id, org_id, run_tier, status, total_cases, passed_cases, started_at, created_at)
-    VALUES (@run_id, @org_id, @run_tier, @status, @total_cases, @passed_cases, @started_at, @created_at)
-  `).run(run);
+    INSERT INTO eval_runs (run_id, org_id, run_tier, status, total_cases, passed_cases, started_at, created_at, judge_model)
+    VALUES (@run_id, @org_id, @run_tier, @status, @total_cases, @passed_cases, @started_at, @created_at, @judge_model)
+  `).run({ ...run, judge_model: run.judge_model ?? null });
 }
 
 export function setRunStatus(
@@ -228,15 +389,21 @@ export function insertResult(r: EvalResult) {
   db.prepare(`
     INSERT INTO eval_results
       (id, run_id, org_id, case_id, case_name, category, variant_num, tier,
-       question, answer, passed, notes, chat_id, exchanges, created_at)
+       question, answer, passed, notes, chat_id, exchanges, created_at,
+       judge_model, judge_cost, judge_prompt_tokens, judge_completion_tokens)
     VALUES
       (@id, @run_id, @org_id, @case_id, @case_name, @category, @variant_num, @tier,
-       @question, @answer, @passed, @notes, @chat_id, @exchanges, @created_at)
+       @question, @answer, @passed, @notes, @chat_id, @exchanges, @created_at,
+       @judge_model, @judge_cost, @judge_prompt_tokens, @judge_completion_tokens)
   `).run({
     ...r,
     passed: r.passed ? 1 : 0,
     notes: JSON.stringify(r.notes),
     exchanges: JSON.stringify(r.exchanges),
+    judge_model: r.judge_model ?? null,
+    judge_cost: r.judge_cost ?? 0,
+    judge_prompt_tokens: r.judge_prompt_tokens ?? 0,
+    judge_completion_tokens: r.judge_completion_tokens ?? 0,
   });
   // Keep the run's passed count current so polling shows live progress.
   db.prepare(

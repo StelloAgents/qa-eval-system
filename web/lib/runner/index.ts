@@ -7,13 +7,15 @@ import path from "node:path";
 import "../env";
 import {
   createRun,
+  getGraderPrompt,
+  getJudgeModel,
   getOrg,
   insertResult,
   setRunStatus,
 } from "../db";
 import { EvalResult, RunTier } from "../types";
 import { kbChat, pathwayRun } from "./bland";
-import { grade, TestCase } from "./judge";
+import { DEFAULT_JUDGE_MODEL, grade, TestCase } from "./judge";
 
 // Bland trips Cloudflare's rate gate (429 / "error code: 1015") at 6+ workers.
 const WORKERS = 4;
@@ -50,6 +52,9 @@ export function startRun(orgId: string, tier: RunTier): string {
     completed_at: null,
     error_message: null,
     created_at: new Date().toISOString(),
+    // Pinned at start so historical spend stays attributable if the org's
+    // model setting is changed later.
+    judge_model: getJudgeModel(orgId) ?? DEFAULT_JUDGE_MODEL,
   });
   // Fire-and-forget: the dev/prod Node process outlives the request, and the
   // poll endpoint reads progress from the DB. (On serverless this would need
@@ -72,6 +77,7 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
     throw new Error("OPENROUTER_API_KEY is not set (required for pathway grading)");
   }
 
+  const judgeModel = getJudgeModel(orgId) ?? DEFAULT_JUDGE_MODEL;
   const allCases = loadCases(orgId);
 
   // Cases that can't be graded on this channel are excluded, not failed --
@@ -150,7 +156,17 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           variant.turns,
           blandKey
         );
-        const { ok, notes } = await grade(c, exchanges, variant, openrouterKey!);
+        // Read the override per job rather than once up front, so a prompt
+        // edited mid-run applies to cases that have not been graded yet.
+        const { ok, notes, usage } = await grade(
+          c,
+          exchanges,
+          variant,
+          openrouterKey!,
+          org.org_name,
+          getGraderPrompt(orgId, c.id),
+          judgeModel
+        );
         save({
           ...base(c),
           variant_num: variantIdx + 1,
@@ -161,6 +177,10 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           notes,
           chat_id: chatId,
           exchanges,
+          judge_model: usage?.model ?? judgeModel,
+          judge_cost: usage?.cost ?? 0,
+          judge_prompt_tokens: usage?.prompt_tokens ?? 0,
+          judge_completion_tokens: usage?.completion_tokens ?? 0,
         });
       } catch (e: any) {
         save({
