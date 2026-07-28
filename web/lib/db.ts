@@ -401,6 +401,30 @@ export async function getCompletedCount(runId: string): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+/** Marks runs that have been queued or running for too long as failed.
+ *
+ * A serverless invocation killed at its duration limit leaves its row stuck in
+ * `running` forever, and orgHasActiveRun would then block every future run for
+ * that org with no way to clear it from the UI. Sweeping first means a stuck
+ * run is self-healing rather than permanent. Returns how many it reaped. */
+export async function reapStaleRuns(
+  orgId: string,
+  olderThanMinutes = 20
+): Promise<number> {
+  const res = await pool().query(
+    `UPDATE ${SCHEMA}.eval_runs
+        SET status = 'failed',
+            completed_at = now(),
+            error_message = COALESCE(error_message,
+              'run did not finish — the process was likely stopped mid-run')
+      WHERE org_id = $1
+        AND status IN ('queued','running')
+        AND started_at < now() - ($2 || ' minutes')::interval`,
+    [orgId, String(olderThanMinutes)]
+  );
+  return res.rowCount ?? 0;
+}
+
 export async function orgHasActiveRun(orgId: string): Promise<boolean> {
   const row = await one<{ n: string }>(
     `SELECT COUNT(*) AS n FROM ${SCHEMA}.eval_runs

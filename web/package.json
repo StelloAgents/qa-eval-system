@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prebuild": "node scripts/collect-cases.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.1.1",
@@ -17,6 +18,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
     "@types/pg": "^8.20.0",
+    "@vercel/functions": "^3.7.6",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.417.0",

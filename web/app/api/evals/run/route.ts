@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrg, orgHasActiveRun } from "@/lib/db";
+import { getOrg, orgHasActiveRun, reapStaleRuns } from "@/lib/db";
 import { startRun } from "@/lib/runner";
 import { RunTier } from "@/lib/types";
 
 // POST /api/evals/run — manual trigger (SPEC.md). Creates a queued run and
 // executes it in the background against the live Bland/OpenRouter APIs.
+
+// The run continues after the response via waitUntil, so the invocation must be
+// allowed to live for the whole suite: measured ~2.5 min for the 74-variant
+// Texans set and ~4 min for Compugen's 115. 800s leaves room for Bland's
+// exponential backoff on a rate-limited run. Vercel caps this at the plan's
+// ceiling, so a lower plan will simply cut it shorter — reapStaleRuns then
+// clears the abandoned row rather than leaving the org blocked.
+export const maxDuration = 800;
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const orgId = body?.org_id as string | undefined;
@@ -26,6 +34,9 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
+  // Clear out runs abandoned by a killed process before deciding whether one is
+  // genuinely in flight, so a timed-out run cannot block the org permanently.
+  await reapStaleRuns(orgId);
   // One active run per org — concurrent runs trip Bland's rate gate.
   if (await orgHasActiveRun(orgId)) {
     return NextResponse.json(

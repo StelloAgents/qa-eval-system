@@ -21,12 +21,20 @@ import { DEFAULT_JUDGE_MODEL, grade, TestCase } from "./judge";
 const WORKERS = 4;
 
 export function loadCases(orgId: string): TestCase[] {
-  // Test cases live in the repo per SPEC.md: <org>/evals/cases.json
-  const p = path.resolve(process.cwd(), "..", orgId, "evals", "cases.json");
-  if (!fs.existsSync(p)) {
-    throw new Error(`no test cases found at ${orgId}/evals/cases.json`);
+  // Two locations, in this order:
+  //   1. <repo>/<org>/evals/cases.json — the source of truth, used in local
+  //      dev so an edit takes effect on the next request with no rebuild.
+  //   2. web/evals/<org>/cases.json — the build-time copy made by
+  //      scripts/collect-cases.mjs. The only one that exists on Vercel, where
+  //      the repo root sits outside the deployment.
+  const candidates = [
+    path.resolve(process.cwd(), "..", orgId, "evals", "cases.json"),
+    path.resolve(process.cwd(), "evals", orgId, "cases.json"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf8"));
   }
-  return JSON.parse(fs.readFileSync(p, "utf8"));
+  throw new Error(`no test cases found at ${orgId}/evals/cases.json`);
 }
 
 async function blandKeyFor(orgId: string): Promise<string> {
@@ -56,10 +64,7 @@ export async function startRun(orgId: string, tier: RunTier): Promise<string> {
     // model setting is changed later.
     judge_model: (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL,
   });
-  // Fire-and-forget: the dev/prod Node process outlives the request, and the
-  // poll endpoint reads progress from the DB. (On serverless this would need
-  // a queue — see SPEC.md roadmap.)
-  executeRun(runId, orgId, tier).catch(async (e) => {
+  const work = executeRun(runId, orgId, tier).catch(async (e) => {
     await setRunStatus(runId, "failed", {
       completed_at: new Date().toISOString(),
       error_message: String(e?.message ?? e),
@@ -67,6 +72,16 @@ export async function startRun(orgId: string, tier: RunTier): Promise<string> {
       /* the run already failed; a failed status write must not mask it */
     });
   });
+
+  // A long-lived `next dev`/`next start` process keeps the promise alive on its
+  // own. Serverless does not: the function is frozen the moment the response is
+  // sent, so the run would never leave `queued`. waitUntil asks the platform to
+  // keep the invocation alive until the work settles, bounded by the route's
+  // maxDuration. Outside Vercel it is a no-op, hence the guard.
+  if (process.env.VERCEL) {
+    const { waitUntil } = await import("@vercel/functions");
+    waitUntil(work);
+  }
   return runId;
 }
 
