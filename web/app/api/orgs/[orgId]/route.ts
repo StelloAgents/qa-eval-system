@@ -5,7 +5,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { orgId: string } }
 ) {
-  const org = getOrg(params.orgId);
+  const org = await getOrg(params.orgId);
   if (!org) return NextResponse.json({ error: "org not found" }, { status: 404 });
   const { org_name, bland_pathway_id, bland_kb_id, is_active } = org;
   return NextResponse.json({ org_name, bland_pathway_id, bland_kb_id, is_active });
@@ -39,7 +39,7 @@ export async function PUT(
       { status: 400 }
     );
   }
-  const updated = updateOrg(params.orgId, { bland_api_key_env, is_active });
+  const updated = await updateOrg(params.orgId, { bland_api_key_env, is_active });
   if (!updated) {
     return NextResponse.json({ error: "org not found" }, { status: 404 });
   }

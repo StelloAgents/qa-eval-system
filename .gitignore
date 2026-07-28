@@ -36,8 +36,13 @@ wheels/
 .DS_Store
 Thumbs.db
 
-# Results (gitignored but created locally)
-results/
+# Eval output written by eval.py (gitignored but created locally).
+# Scoped to <org>/evals/results/ on purpose: a bare `results/` also matched
+# web/app/api/evals/run/[runId]/results/, silently keeping that API route out
+# of the repo entirely. The leading **/ matters: a pattern containing a slash
+# is anchored to the repo root, so plain `evals/results/` would miss
+# texans/evals/results/.
+**/evals/results/
 
 # Web UI (Next.js)
 node_modules/

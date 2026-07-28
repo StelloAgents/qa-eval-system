@@ -24,8 +24,8 @@ const PLACEHOLDERS = JUDGE_PLACEHOLDERS.map((p) => ({ ...p }));
 
 /** 404 unless the org exists and actually defines this case. Without the second
  * check a typo'd case id would happily store an override that never runs. */
-function resolve(orgId: string, caseId: string): string | null {
-  if (!getOrg(orgId)) return "org not found";
+async function resolve(orgId: string, caseId: string): Promise<string | null> {
+  if (!(await getOrg(orgId))) return "org not found";
   try {
     if (!loadCases(orgId).some((c) => c.id === caseId)) {
       return `no test case "${caseId}" for org "${orgId}"`;
@@ -36,11 +36,11 @@ function resolve(orgId: string, caseId: string): string | null {
   return null;
 }
 
-function body(orgId: string, caseId: string): GraderPrompt {
-  const override = getGraderPrompt(orgId, caseId);
+async function body(orgId: string, caseId: string): Promise<GraderPrompt> {
+  const override = await getGraderPrompt(orgId, caseId);
   const effective = override ?? DEFAULT_JUDGE_TEMPLATE;
 
-  const org = getOrg(orgId)!;
+  const org = (await getOrg(orgId))!;
   const testCase = loadCases(orgId).find((c) => c.id === caseId)!;
   // Ground truth is per-variant for payment_due cases; variant 1 is
   // representative and is what the preview labels itself as showing.
@@ -82,16 +82,16 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { orgId: string; caseId: string } }
 ) {
-  const err = resolve(params.orgId, params.caseId);
+  const err = await resolve(params.orgId, params.caseId);
   if (err) return NextResponse.json({ error: err }, { status: 404 });
-  return NextResponse.json(body(params.orgId, params.caseId));
+  return NextResponse.json(await body(params.orgId, params.caseId));
 }
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: { orgId: string; caseId: string } }
 ) {
-  const err = resolve(params.orgId, params.caseId);
+  const err = await resolve(params.orgId, params.caseId);
   if (err) return NextResponse.json({ error: err }, { status: 404 });
 
   const payload = await req.json().catch(() => null);
@@ -111,8 +111,8 @@ export async function PUT(
     );
   }
 
-  setGraderPrompt(params.orgId, params.caseId, template);
-  const result = body(params.orgId, params.caseId);
+  await setGraderPrompt(params.orgId, params.caseId, template);
+  const result = await body(params.orgId, params.caseId);
   // Advisory only: dropping {{expected}} is unusual but legitimate if the
   // rubric has been inlined, so it warns rather than rejecting.
   const warning = template.includes("{{expected}}")
@@ -125,8 +125,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { orgId: string; caseId: string } }
 ) {
-  const err = resolve(params.orgId, params.caseId);
+  const err = await resolve(params.orgId, params.caseId);
   if (err) return NextResponse.json({ error: err }, { status: 404 });
-  clearGraderPrompt(params.orgId, params.caseId);
-  return NextResponse.json(body(params.orgId, params.caseId));
+  await clearGraderPrompt(params.orgId, params.caseId);
+  return NextResponse.json(await body(params.orgId, params.caseId));
 }

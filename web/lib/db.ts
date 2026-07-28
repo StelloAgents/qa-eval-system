@@ -1,7 +1,5 @@
 import "./env";
-import fs from "node:fs";
-import path from "node:path";
-import Database from "better-sqlite3";
+import { Pool } from "pg";
 import {
   CompareEntry,
   CompareResult,
@@ -10,160 +8,64 @@ import {
   EvalRun,
 } from "./types";
 
-// SQLite implementation of the SPEC.md schema (eval_orgs / eval_runs /
-// eval_results). Column names match the spec; SQLite types stand in for
-// Postgres types until the Supabase migration. Run IDs double as PKs
-// (spec uses UUIDs; we store the id in run_id for readability).
+// Postgres (Supabase) implementation of the SPEC.md schema. Tables live in the
+// `qa_eval` schema — the target project is production for another application,
+// so this keeps our tables from colliding with the raw call data alongside it.
+// DDL lives in supabase/migrations/0001_qa_eval_schema.sql and is applied out
+// of band; this module only reads and writes.
+//
+// Everything here is async: better-sqlite3 was synchronous, and no synchronous
+// Postgres driver exists. Call sites are all route handlers or the runner, so
+// they were already async.
 
-const globalForDb = globalThis as unknown as { __qaEvalDb?: Database.Database };
+const SCHEMA = "qa_eval";
 
-// next dev/start run with cwd = web/, so the file lands in web/data (gitignored).
-const DATA_DIR = process.env.QA_EVAL_DATA_DIR ?? path.resolve(process.cwd(), "data");
+const globalForDb = globalThis as unknown as { __qaEvalPool?: Pool };
 
-function open(): Database.Database {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const db = new Database(path.join(DATA_DIR, "qa-eval.db"));
-  db.pragma("journal_mode = WAL");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS eval_orgs (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL UNIQUE,
-      org_name TEXT NOT NULL,
-      bland_pathway_id TEXT NOT NULL,
-      bland_api_key_env TEXT NOT NULL,
-      bland_kb_id TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+function pool(): Pool {
+  if (globalForDb.__qaEvalPool) return globalForDb.__qaEvalPool;
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "DATABASE_URL is not set — add the Supabase connection string to the repo-root .env"
     );
-
-    CREATE TABLE IF NOT EXISTS eval_runs (
-      run_id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL REFERENCES eval_orgs(org_id),
-      run_tier TEXT NOT NULL,
-      status TEXT NOT NULL,
-      total_cases INTEGER NOT NULL DEFAULT 0,
-      passed_cases INTEGER NOT NULL DEFAULT 0,
-      started_at TEXT,
-      completed_at TEXT,
-      error_message TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS eval_results (
-      id TEXT PRIMARY KEY,
-      run_id TEXT NOT NULL REFERENCES eval_runs(run_id),
-      org_id TEXT NOT NULL,
-      case_id TEXT NOT NULL,
-      case_name TEXT,
-      category TEXT,
-      variant_num INTEGER,
-      tier TEXT,
-      question TEXT,
-      answer TEXT,
-      passed INTEGER NOT NULL DEFAULT 0,
-      notes TEXT NOT NULL DEFAULT '[]',
-      chat_id TEXT,
-      exchanges TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Per-case grader prompt overrides. A case with no row here is graded with
-    -- DEFAULT_JUDGE_TEMPLATE; "reset to default" deletes the row rather than
-    -- storing a copy of the default, so cases stay on the default as it evolves.
-    CREATE TABLE IF NOT EXISTS grader_prompts (
-      org_id TEXT NOT NULL,
-      case_id TEXT NOT NULL,
-      template TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY (org_id, case_id)
-    );
-
-    -- Per-org grader configuration. Absent row means the built-in default.
-    CREATE TABLE IF NOT EXISTS org_settings (
-      org_id TEXT PRIMARY KEY,
-      judge_model TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_results_run ON eval_results(run_id);
-    CREATE INDEX IF NOT EXISTS idx_runs_org ON eval_runs(org_id, created_at DESC);
-  `);
-  migrate(db);
-  return db;
-}
-
-/** CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so
- * columns added after a database was first created need an explicit ALTER.
- * Adding a column is the only schema change this needs so far; each is
- * idempotent via the table_info check. */
-function migrate(db: Database.Database) {
-  const add = (table: string, column: string, decl: string) => {
-    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-    if (!cols.some((c) => c.name === column)) {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
-    }
-  };
-  add("eval_runs", "judge_model", "TEXT");
-  add("eval_results", "judge_model", "TEXT");
-  add("eval_results", "judge_cost", "REAL NOT NULL DEFAULT 0");
-  add("eval_results", "judge_prompt_tokens", "INTEGER NOT NULL DEFAULT 0");
-  add("eval_results", "judge_completion_tokens", "INTEGER NOT NULL DEFAULT 0");
-}
-
-// Lazy singleton: route modules are imported during `next build` page-data
-// collection, which must not open (or lock) the database file.
-function getDb(): Database.Database {
-  const db = (globalForDb.__qaEvalDb ??= open());
-  seedOrgs(db);
-  return db;
-}
-
-// --- seed -------------------------------------------------------------------
-// Org config per SPEC.md §Org Onboarding. The Texans row carries the real
-// pathway/KB IDs (from the repo README); its API key lives in the env var
-// named by bland_api_key_env — never in the DB. Compugen is a placeholder
-// until its pathway exists, so it stays inactive.
-
-let seeded = false;
-export function seedOrgs(db: Database.Database) {
-  if (seeded) return;
-  seeded = true;
-  const insert = db.prepare(`
-    INSERT INTO eval_orgs (id, org_id, org_name, bland_pathway_id, bland_api_key_env, bland_kb_id, is_active)
-    VALUES (@id, @org_id, @org_name, @bland_pathway_id, @bland_api_key_env, @bland_kb_id, @is_active)
-    ON CONFLICT(org_id) DO NOTHING
-  `);
-  insert.run({
-    id: crypto.randomUUID(),
-    org_id: "texans",
-    org_name: "Houston Texans",
-    bland_pathway_id: "513c8d58-4499-4801-9d05-c84dbf30a740",
-    bland_api_key_env: "BLAND_API_KEY_TEXANS",
-    bland_kb_id: "KB-0b66eefe-6f48-4891-b905-2126f720c89e",
-    is_active: 1,
+  }
+  const p = new Pool({
+    connectionString,
+    // Supabase terminates TLS with its own CA; the pooler hostname does not
+    // match the certificate, so verification is relaxed rather than disabled.
+    ssl: { rejectUnauthorized: false },
+    // The transaction pooler multiplexes, so a large local pool buys nothing
+    // and just holds connections open.
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 15_000,
   });
-  insert.run({
-    id: crypto.randomUUID(),
-    org_id: "compugen",
-    org_name: "Compugen",
-    bland_pathway_id: "7a1f2c90-3b4e-4d21-9c8f-1e2a3b4c5d6e",
-    bland_api_key_env: "BLAND_API_KEY_COMPUGEN",
-    bland_kb_id: "KB-9d4c2a11-8f3b-4c7e-b2a1-5f6e7d8c9b0a",
-    is_active: 0,
-  });
+  // A pool error (e.g. the pooler dropping an idle socket) is emitted on the
+  // pool, not a query, and would otherwise crash the process.
+  p.on("error", (e) => console.error("[db] idle client error:", e.message));
+  globalForDb.__qaEvalPool = p;
+  return p;
+}
+
+async function query<T = any>(text: string, params: unknown[] = []): Promise<T[]> {
+  const res = await pool().query(text, params as any[]);
+  return res.rows as T[];
+}
+
+async function one<T = any>(text: string, params: unknown[] = []): Promise<T | undefined> {
+  return (await query<T>(text, params))[0];
 }
 
 // --- row mapping -------------------------------------------------------------
 
 interface OrgRow {
-  id: string;
   org_id: string;
   org_name: string;
   bland_pathway_id: string;
   bland_api_key_env: string;
   bland_kb_id: string | null;
-  is_active: number;
+  is_active: boolean;
 }
 
 export interface StoredOrg extends EvalOrg {
@@ -176,82 +78,92 @@ function toOrg(r: OrgRow): StoredOrg {
     org_name: r.org_name,
     bland_pathway_id: r.bland_pathway_id,
     bland_kb_id: r.bland_kb_id,
-    is_active: !!r.is_active,
+    is_active: r.is_active,
     bland_api_key_env: r.bland_api_key_env,
+  };
+}
+
+/** Postgres returns timestamptz as a Date; the API and UI speak ISO strings. */
+const iso = (v: Date | string | null): string | null =>
+  v == null ? null : v instanceof Date ? v.toISOString() : v;
+
+function toRun(r: any): EvalRun {
+  return {
+    ...r,
+    started_at: iso(r.started_at),
+    completed_at: iso(r.completed_at),
+    created_at: iso(r.created_at)!,
   };
 }
 
 function toResult(r: any): EvalResult {
   return {
     ...r,
-    passed: !!r.passed,
-    notes: JSON.parse(r.notes ?? "[]"),
-    exchanges: JSON.parse(r.exchanges ?? "[]"),
+    // jsonb comes back already parsed, unlike the TEXT columns SQLite used.
+    notes: r.notes ?? [],
+    exchanges: r.exchanges ?? [],
+    created_at: iso(r.created_at)!,
+    judge_cost: Number(r.judge_cost ?? 0),
   };
 }
 
-// --- queries used by the API routes ------------------------------------------
+// --- orgs --------------------------------------------------------------------
 
-export function listOrgs(): StoredOrg[] {
-  const rows = getDb()
-    .prepare("SELECT * FROM eval_orgs ORDER BY org_name")
-    .all() as OrgRow[];
+export async function listOrgs(): Promise<StoredOrg[]> {
+  const rows = await query<OrgRow>(
+    `SELECT * FROM ${SCHEMA}.eval_orgs ORDER BY org_name`
+  );
   return rows.map(toOrg);
 }
 
-export function getOrg(orgId: string): StoredOrg | undefined {
-  const row = getDb()
-    .prepare("SELECT * FROM eval_orgs WHERE org_id = ?")
-    .get(orgId) as OrgRow | undefined;
+export async function getOrg(orgId: string): Promise<StoredOrg | undefined> {
+  const row = await one<OrgRow>(
+    `SELECT * FROM ${SCHEMA}.eval_orgs WHERE org_id = $1`,
+    [orgId]
+  );
   return row && toOrg(row);
 }
 
 /** PUT /api/orgs/:org_id (SPEC.md). Only the two mutable fields are settable;
  * pathway/KB ids are seeded config, and the API key itself never touches the
  * DB — bland_api_key_env only names the env var that holds it. */
-export function updateOrg(
+export async function updateOrg(
   orgId: string,
   patch: { bland_api_key_env?: string; is_active?: boolean }
-): StoredOrg | undefined {
-  if (!getOrg(orgId)) return undefined;
-  getDb()
-    .prepare(`
-      UPDATE eval_orgs SET
-        bland_api_key_env = COALESCE(@bland_api_key_env, bland_api_key_env),
-        is_active = COALESCE(@is_active, is_active),
-        updated_at = datetime('now')
-      WHERE org_id = @org_id
-    `)
-    .run({
-      org_id: orgId,
-      bland_api_key_env: patch.bland_api_key_env ?? null,
-      is_active: patch.is_active === undefined ? null : patch.is_active ? 1 : 0,
-    });
-  return getOrg(orgId);
+): Promise<StoredOrg | undefined> {
+  const row = await one<OrgRow>(
+    `UPDATE ${SCHEMA}.eval_orgs SET
+       bland_api_key_env = COALESCE($2, bland_api_key_env),
+       is_active         = COALESCE($3, is_active),
+       updated_at        = now()
+     WHERE org_id = $1
+     RETURNING *`,
+    [orgId, patch.bland_api_key_env ?? null, patch.is_active ?? null]
+  );
+  return row && toOrg(row);
 }
 
 // --- grader model + cost -----------------------------------------------------
 
-/** The model this org grades with, or undefined to use the built-in default. */
-export function getJudgeModel(orgId: string): string | undefined {
-  const row = getDb()
-    .prepare("SELECT judge_model FROM org_settings WHERE org_id = ?")
-    .get(orgId) as { judge_model: string } | undefined;
+export async function getJudgeModel(orgId: string): Promise<string | undefined> {
+  const row = await one<{ judge_model: string }>(
+    `SELECT judge_model FROM ${SCHEMA}.org_settings WHERE org_id = $1`,
+    [orgId]
+  );
   return row?.judge_model;
 }
 
-export function setJudgeModel(orgId: string, model: string) {
-  getDb()
-    .prepare(`
-      INSERT INTO org_settings (org_id, judge_model, updated_at)
-      VALUES (@org_id, @model, @updated_at)
-      ON CONFLICT(org_id) DO UPDATE SET judge_model = @model, updated_at = @updated_at
-    `)
-    .run({ org_id: orgId, model, updated_at: new Date().toISOString() });
+export async function setJudgeModel(orgId: string, model: string): Promise<void> {
+  await query(
+    `INSERT INTO ${SCHEMA}.org_settings (org_id, judge_model, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (org_id) DO UPDATE SET judge_model = $2, updated_at = now()`,
+    [orgId, model]
+  );
 }
 
-export function clearJudgeModel(orgId: string) {
-  getDb().prepare("DELETE FROM org_settings WHERE org_id = ?").run(orgId);
+export async function clearJudgeModel(orgId: string): Promise<void> {
+  await query(`DELETE FROM ${SCHEMA}.org_settings WHERE org_id = $1`, [orgId]);
 }
 
 export interface RunCost {
@@ -269,188 +181,240 @@ export interface RunCost {
 /** Per-run spend. Only pathway results carry a judge cost; KB results are
  * substring checks and cost nothing, so they contribute zero rather than
  * being excluded (the call count stays honest that way). */
-export function listRunCosts(orgId?: string, limit = 100): RunCost[] {
-  const where = orgId ? "WHERE r.org_id = ?" : "";
-  const args = orgId ? [orgId, limit] : [limit];
-  return getDb()
-    .prepare(`
-      SELECT r.run_id, r.org_id, r.run_tier, r.created_at, r.judge_model,
-             COALESCE(SUM(CASE WHEN e.judge_cost > 0 THEN 1 ELSE 0 END), 0) AS graded_calls,
-             COALESCE(SUM(e.judge_cost), 0) AS cost,
-             COALESCE(SUM(e.judge_prompt_tokens), 0) AS prompt_tokens,
-             COALESCE(SUM(e.judge_completion_tokens), 0) AS completion_tokens
-      FROM eval_runs r
-      LEFT JOIN eval_results e ON e.run_id = r.run_id
-      ${where}
-      GROUP BY r.run_id
-      ORDER BY r.created_at DESC
-      LIMIT ?
-    `)
-    .all(...args) as RunCost[];
+export async function listRunCosts(orgId?: string, limit = 100): Promise<RunCost[]> {
+  const rows = await query<any>(
+    `SELECT r.run_id, r.org_id, r.run_tier, r.created_at, r.judge_model,
+            COUNT(*) FILTER (WHERE e.judge_cost > 0)         AS graded_calls,
+            COALESCE(SUM(e.judge_cost), 0)                   AS cost,
+            COALESCE(SUM(e.judge_prompt_tokens), 0)          AS prompt_tokens,
+            COALESCE(SUM(e.judge_completion_tokens), 0)      AS completion_tokens
+     FROM ${SCHEMA}.eval_runs r
+     LEFT JOIN ${SCHEMA}.eval_results e ON e.run_id = r.run_id
+     ${orgId ? "WHERE r.org_id = $2" : ""}
+     GROUP BY r.run_id
+     ORDER BY r.created_at DESC
+     LIMIT $1`,
+    orgId ? [limit, orgId] : [limit]
+  );
+  // Postgres returns COUNT/SUM as strings to preserve bigint/numeric precision.
+  return rows.map((r) => ({
+    ...r,
+    created_at: iso(r.created_at)!,
+    graded_calls: Number(r.graded_calls),
+    cost: Number(r.cost),
+    prompt_tokens: Number(r.prompt_tokens),
+    completion_tokens: Number(r.completion_tokens),
+  }));
 }
 
-export function costByModel(): { judge_model: string; calls: number; cost: number }[] {
-  return getDb()
-    .prepare(`
-      SELECT COALESCE(judge_model, 'unknown') AS judge_model,
-             COUNT(*) AS calls, COALESCE(SUM(judge_cost), 0) AS cost
-      FROM eval_results WHERE judge_cost > 0
-      GROUP BY judge_model ORDER BY cost DESC
-    `)
-    .all() as { judge_model: string; calls: number; cost: number }[];
+export async function costByModel(): Promise<
+  { judge_model: string; calls: number; cost: number }[]
+> {
+  const rows = await query<any>(
+    `SELECT COALESCE(judge_model, 'unknown') AS judge_model,
+            COUNT(*) AS calls, COALESCE(SUM(judge_cost), 0) AS cost
+     FROM ${SCHEMA}.eval_results WHERE judge_cost > 0
+     GROUP BY judge_model ORDER BY cost DESC`
+  );
+  return rows.map((r) => ({
+    judge_model: r.judge_model,
+    calls: Number(r.calls),
+    cost: Number(r.cost),
+  }));
 }
 
-export function costByOrg(): { org_id: string; runs: number; cost: number }[] {
-  return getDb()
-    .prepare(`
-      SELECT r.org_id, COUNT(DISTINCT r.run_id) AS runs,
-             COALESCE(SUM(e.judge_cost), 0) AS cost
-      FROM eval_runs r LEFT JOIN eval_results e ON e.run_id = r.run_id
-      GROUP BY r.org_id ORDER BY cost DESC
-    `)
-    .all() as { org_id: string; runs: number; cost: number }[];
+export async function costByOrg(): Promise<
+  { org_id: string; runs: number; cost: number }[]
+> {
+  const rows = await query<any>(
+    `SELECT r.org_id, COUNT(DISTINCT r.run_id) AS runs,
+            COALESCE(SUM(e.judge_cost), 0) AS cost
+     FROM ${SCHEMA}.eval_runs r
+     LEFT JOIN ${SCHEMA}.eval_results e ON e.run_id = r.run_id
+     GROUP BY r.org_id ORDER BY cost DESC`
+  );
+  return rows.map((r) => ({
+    org_id: r.org_id,
+    runs: Number(r.runs),
+    cost: Number(r.cost),
+  }));
 }
 
 // --- grader prompt overrides -------------------------------------------------
 
 /** The stored override for a case, or undefined when it uses the default. */
-export function getGraderPrompt(orgId: string, caseId: string): string | undefined {
-  const row = getDb()
-    .prepare("SELECT template FROM grader_prompts WHERE org_id = ? AND case_id = ?")
-    .get(orgId, caseId) as { template: string } | undefined;
+export async function getGraderPrompt(
+  orgId: string,
+  caseId: string
+): Promise<string | undefined> {
+  const row = await one<{ template: string }>(
+    `SELECT template FROM ${SCHEMA}.grader_prompts WHERE org_id = $1 AND case_id = $2`,
+    [orgId, caseId]
+  );
   return row?.template;
 }
 
 /** Case ids for one org that have an override, for badging the catalogue
  * without a request per case. */
-export function listCustomisedCaseIds(orgId: string): Set<string> {
-  const rows = getDb()
-    .prepare("SELECT case_id FROM grader_prompts WHERE org_id = ?")
-    .all(orgId) as { case_id: string }[];
+export async function listCustomisedCaseIds(orgId: string): Promise<Set<string>> {
+  const rows = await query<{ case_id: string }>(
+    `SELECT case_id FROM ${SCHEMA}.grader_prompts WHERE org_id = $1`,
+    [orgId]
+  );
   return new Set(rows.map((r) => r.case_id));
 }
 
-export function setGraderPrompt(orgId: string, caseId: string, template: string) {
-  getDb()
-    .prepare(`
-      INSERT INTO grader_prompts (org_id, case_id, template, updated_at)
-      VALUES (@org_id, @case_id, @template, @updated_at)
-      ON CONFLICT(org_id, case_id)
-      DO UPDATE SET template = @template, updated_at = @updated_at
-    `)
-    .run({
-      org_id: orgId,
-      case_id: caseId,
-      template,
-      updated_at: new Date().toISOString(),
-    });
+export async function setGraderPrompt(
+  orgId: string,
+  caseId: string,
+  template: string
+): Promise<void> {
+  await query(
+    `INSERT INTO ${SCHEMA}.grader_prompts (org_id, case_id, template, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT (org_id, case_id)
+     DO UPDATE SET template = $3, updated_at = now()`,
+    [orgId, caseId, template]
+  );
 }
 
 /** Reset to default. Deletes the row so the case tracks the default template. */
-export function clearGraderPrompt(orgId: string, caseId: string): boolean {
-  const info = getDb()
-    .prepare("DELETE FROM grader_prompts WHERE org_id = ? AND case_id = ?")
-    .run(orgId, caseId);
-  return info.changes > 0;
+export async function clearGraderPrompt(
+  orgId: string,
+  caseId: string
+): Promise<boolean> {
+  const res = await pool().query(
+    `DELETE FROM ${SCHEMA}.grader_prompts WHERE org_id = $1 AND case_id = $2`,
+    [orgId, caseId]
+  );
+  return (res.rowCount ?? 0) > 0;
 }
 
-export function createRun(run: EvalRun) {
-  // created_at is written explicitly (not left to the column's datetime('now')
-  // default): SQLite emits UTC as "YYYY-MM-DD HH:MM:SS" with no zone marker,
-  // which `new Date()` in the UI reads as *local* time and renders hours off.
-  getDb().prepare(`
-    INSERT INTO eval_runs (run_id, org_id, run_tier, status, total_cases, passed_cases, started_at, created_at, judge_model)
-    VALUES (@run_id, @org_id, @run_tier, @status, @total_cases, @passed_cases, @started_at, @created_at, @judge_model)
-  `).run({ ...run, judge_model: run.judge_model ?? null });
+// --- runs and results --------------------------------------------------------
+
+export async function createRun(run: EvalRun): Promise<void> {
+  await query(
+    `INSERT INTO ${SCHEMA}.eval_runs
+       (run_id, org_id, run_tier, status, total_cases, passed_cases, started_at, created_at, judge_model)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      run.run_id,
+      run.org_id,
+      run.run_tier,
+      run.status,
+      run.total_cases,
+      run.passed_cases,
+      run.started_at,
+      run.created_at,
+      run.judge_model ?? null,
+    ]
+  );
 }
 
-export function setRunStatus(
+export async function setRunStatus(
   runId: string,
   status: string,
   extra: Partial<Pick<EvalRun, "total_cases" | "completed_at" | "error_message">> = {}
-) {
-  getDb().prepare(`
-    UPDATE eval_runs SET status = @status,
-      total_cases = COALESCE(@total_cases, total_cases),
-      completed_at = COALESCE(@completed_at, completed_at),
-      error_message = COALESCE(@error_message, error_message)
-    WHERE run_id = @run_id
-  `).run({
-    run_id: runId,
-    status,
-    total_cases: extra.total_cases ?? null,
-    completed_at: extra.completed_at ?? null,
-    error_message: extra.error_message ?? null,
-  });
+): Promise<void> {
+  await query(
+    `UPDATE ${SCHEMA}.eval_runs SET
+       status        = $2,
+       total_cases   = COALESCE($3, total_cases),
+       completed_at  = COALESCE($4, completed_at),
+       error_message = COALESCE($5, error_message)
+     WHERE run_id = $1`,
+    [
+      runId,
+      status,
+      extra.total_cases ?? null,
+      extra.completed_at ?? null,
+      extra.error_message ?? null,
+    ]
+  );
 }
 
-export function insertResult(r: EvalResult) {
-  const db = getDb();
-  db.prepare(`
-    INSERT INTO eval_results
-      (id, run_id, org_id, case_id, case_name, category, variant_num, tier,
-       question, answer, passed, notes, chat_id, exchanges, created_at,
-       judge_model, judge_cost, judge_prompt_tokens, judge_completion_tokens)
-    VALUES
-      (@id, @run_id, @org_id, @case_id, @case_name, @category, @variant_num, @tier,
-       @question, @answer, @passed, @notes, @chat_id, @exchanges, @created_at,
-       @judge_model, @judge_cost, @judge_prompt_tokens, @judge_completion_tokens)
-  `).run({
-    ...r,
-    passed: r.passed ? 1 : 0,
-    notes: JSON.stringify(r.notes),
-    exchanges: JSON.stringify(r.exchanges),
-    judge_model: r.judge_model ?? null,
-    judge_cost: r.judge_cost ?? 0,
-    judge_prompt_tokens: r.judge_prompt_tokens ?? 0,
-    judge_completion_tokens: r.judge_completion_tokens ?? 0,
-  });
+export async function insertResult(r: EvalResult): Promise<void> {
+  await query(
+    `INSERT INTO ${SCHEMA}.eval_results
+       (id, run_id, org_id, case_id, case_name, category, variant_num, tier,
+        question, answer, passed, notes, chat_id, exchanges, created_at,
+        judge_model, judge_cost, judge_prompt_tokens, judge_completion_tokens)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14::jsonb,$15,$16,$17,$18,$19)`,
+    [
+      r.id,
+      r.run_id,
+      r.org_id,
+      r.case_id,
+      r.case_name,
+      r.category,
+      r.variant_num,
+      r.tier,
+      r.question,
+      r.answer,
+      r.passed,
+      JSON.stringify(r.notes),
+      r.chat_id,
+      JSON.stringify(r.exchanges),
+      r.created_at,
+      r.judge_model ?? null,
+      r.judge_cost ?? 0,
+      r.judge_prompt_tokens ?? 0,
+      r.judge_completion_tokens ?? 0,
+    ]
+  );
   // Keep the run's passed count current so polling shows live progress.
-  db.prepare(
-    "UPDATE eval_runs SET passed_cases = passed_cases + ? WHERE run_id = ?"
-  ).run(r.passed ? 1 : 0, r.run_id);
+  await query(
+    `UPDATE ${SCHEMA}.eval_runs SET passed_cases = passed_cases + $2 WHERE run_id = $1`,
+    [r.run_id, r.passed ? 1 : 0]
+  );
 }
 
-export function listRuns(orgId: string, limit = 10): EvalRun[] {
-  return getDb()
-    .prepare(
-      "SELECT * FROM eval_runs WHERE org_id = ? ORDER BY created_at DESC LIMIT ?"
-    )
-    .all(orgId, limit) as EvalRun[];
+export async function listRuns(orgId: string, limit = 10): Promise<EvalRun[]> {
+  const rows = await query<any>(
+    `SELECT * FROM ${SCHEMA}.eval_runs WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [orgId, limit]
+  );
+  return rows.map(toRun);
 }
 
-export function getRun(runId: string): EvalRun | undefined {
-  return getDb().prepare("SELECT * FROM eval_runs WHERE run_id = ?").get(runId) as
-    | EvalRun
-    | undefined;
+export async function getRun(runId: string): Promise<EvalRun | undefined> {
+  const row = await one<any>(
+    `SELECT * FROM ${SCHEMA}.eval_runs WHERE run_id = $1`,
+    [runId]
+  );
+  return row && toRun(row);
 }
 
-export function getResults(runId: string): EvalResult[] {
-  const rows = getDb()
-    .prepare("SELECT * FROM eval_results WHERE run_id = ? ORDER BY created_at")
-    .all(runId);
+export async function getResults(runId: string): Promise<EvalResult[]> {
+  const rows = await query<any>(
+    `SELECT * FROM ${SCHEMA}.eval_results WHERE run_id = $1 ORDER BY created_at`,
+    [runId]
+  );
   return rows.map(toResult);
 }
 
-export function getCompletedCount(runId: string): number {
-  const row = getDb()
-    .prepare("SELECT COUNT(*) AS n FROM eval_results WHERE run_id = ?")
-    .get(runId) as { n: number };
-  return row.n;
+export async function getCompletedCount(runId: string): Promise<number> {
+  const row = await one<{ n: string }>(
+    `SELECT COUNT(*) AS n FROM ${SCHEMA}.eval_results WHERE run_id = $1`,
+    [runId]
+  );
+  return Number(row?.n ?? 0);
 }
 
-export function orgHasActiveRun(orgId: string): boolean {
-  const row = getDb()
-    .prepare(
-      "SELECT COUNT(*) AS n FROM eval_runs WHERE org_id = ? AND status IN ('queued','running')"
-    )
-    .get(orgId) as { n: number };
-  return row.n > 0;
+export async function orgHasActiveRun(orgId: string): Promise<boolean> {
+  const row = await one<{ n: string }>(
+    `SELECT COUNT(*) AS n FROM ${SCHEMA}.eval_runs
+     WHERE org_id = $1 AND status IN ('queued','running')`,
+    [orgId]
+  );
+  return Number(row?.n ?? 0) > 0;
 }
 
-export function compareRuns(runAId: string, runBId: string): CompareResult | null {
-  const a = getResults(runAId);
-  const b = getResults(runBId);
+export async function compareRuns(
+  runAId: string,
+  runBId: string
+): Promise<CompareResult | null> {
+  const [a, b] = await Promise.all([getResults(runAId), getResults(runBId)]);
   if (!a.length || !b.length) return null;
 
   const key = (r: EvalResult) => `${r.case_id}#${r.tier}#v${r.variant_num}`;

@@ -1,5 +1,5 @@
 // Run orchestration: executes a full eval run against the live Bland APIs and
-// records results in SQLite as they complete (so the poll endpoint shows real
+// records results in Postgres as they complete (so the poll endpoint shows real
 // progress). Port of eval.py's main() with the reporting swapped for DB writes.
 
 import fs from "node:fs";
@@ -29,8 +29,8 @@ export function loadCases(orgId: string): TestCase[] {
   return JSON.parse(fs.readFileSync(p, "utf8"));
 }
 
-function blandKeyFor(orgId: string): string {
-  const org = getOrg(orgId);
+async function blandKeyFor(orgId: string): Promise<string> {
+  const org = await getOrg(orgId);
   const key =
     (org && process.env[org.bland_api_key_env]) || process.env.BLAND_API_KEY;
   if (!key) throw new Error(`no Bland API key for org ${orgId} (check .env)`);
@@ -38,10 +38,10 @@ function blandKeyFor(orgId: string): string {
 }
 
 /** Insert a queued run row and fire the execution in the background.
- * Returns the run_id immediately; the frontend polls for status. */
-export function startRun(orgId: string, tier: RunTier): string {
+ * Returns the run_id once the row exists; the frontend polls for status. */
+export async function startRun(orgId: string, tier: RunTier): Promise<string> {
   const runId = crypto.randomUUID();
-  createRun({
+  await createRun({
     run_id: runId,
     org_id: orgId,
     run_tier: tier,
@@ -54,30 +54,32 @@ export function startRun(orgId: string, tier: RunTier): string {
     created_at: new Date().toISOString(),
     // Pinned at start so historical spend stays attributable if the org's
     // model setting is changed later.
-    judge_model: getJudgeModel(orgId) ?? DEFAULT_JUDGE_MODEL,
+    judge_model: (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL,
   });
   // Fire-and-forget: the dev/prod Node process outlives the request, and the
   // poll endpoint reads progress from the DB. (On serverless this would need
   // a queue — see SPEC.md roadmap.)
   executeRun(runId, orgId, tier).catch(async (e) => {
-    setRunStatus(runId, "failed", {
+    await setRunStatus(runId, "failed", {
       completed_at: new Date().toISOString(),
       error_message: String(e?.message ?? e),
+    }).catch(() => {
+      /* the run already failed; a failed status write must not mask it */
     });
   });
   return runId;
 }
 
 async function executeRun(runId: string, orgId: string, tier: RunTier) {
-  const org = getOrg(orgId);
+  const org = await getOrg(orgId);
   if (!org) throw new Error(`unknown org ${orgId}`);
-  const blandKey = blandKeyFor(orgId);
+  const blandKey = await blandKeyFor(orgId);
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   if (tier !== "kb" && !openrouterKey) {
     throw new Error("OPENROUTER_API_KEY is not set (required for pathway grading)");
   }
 
-  const judgeModel = getJudgeModel(orgId) ?? DEFAULT_JUDGE_MODEL;
+  const judgeModel = (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL;
   const allCases = loadCases(orgId);
 
   // Cases that can't be graded on this channel are excluded, not failed --
@@ -96,7 +98,7 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
   }
 
   const total = pathwayJobs.length + kbJobs.length;
-  setRunStatus(runId, "running", { total_cases: total });
+  await setRunStatus(runId, "running", { total_cases: total });
 
   let seq = 0;
   const base = (c: TestCase) => ({
@@ -106,6 +108,8 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
     case_name: c.name,
     category: c.category,
   });
+  // Awaited at every call site: an unawaited insert would let the run be
+  // marked completed before its results were written.
   const save = (r: Omit<EvalResult, "id" | "created_at">) =>
     insertResult({
       ...r,
@@ -114,14 +118,14 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
     });
 
   await Promise.all([
-    pool(kbJobs, WORKERS, async (c) => {
+    workerPool(kbJobs, WORKERS, async (c) => {
       const question = c.variants[0].turns[c.variants[0].turns.length - 1];
       try {
         const ans = await kbChat(org.bland_kb_id!, question, blandKey);
         const miss = (c.kb_expect ?? []).filter(
           (s) => !ans.toLowerCase().includes(s.toLowerCase())
         );
-        save({
+        await save({
           ...base(c),
           variant_num: 1,
           tier: "kb",
@@ -135,7 +139,7 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           exchanges: [],
         });
       } catch (e: any) {
-        save({
+        await save({
           ...base(c),
           variant_num: 1,
           tier: "kb",
@@ -148,7 +152,7 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
         });
       }
     }),
-    pool(pathwayJobs, WORKERS, async ({ c, variantIdx }) => {
+    workerPool(pathwayJobs, WORKERS, async ({ c, variantIdx }) => {
       const variant = c.variants[variantIdx];
       try {
         const { chatId, exchanges } = await pathwayRun(
@@ -164,10 +168,10 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           variant,
           openrouterKey!,
           org.org_name,
-          getGraderPrompt(orgId, c.id),
+          await getGraderPrompt(orgId, c.id),
           judgeModel
         );
-        save({
+        await save({
           ...base(c),
           variant_num: variantIdx + 1,
           tier: "pathway",
@@ -183,7 +187,7 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           judge_completion_tokens: usage?.completion_tokens ?? 0,
         });
       } catch (e: any) {
-        save({
+        await save({
           ...base(c),
           variant_num: variantIdx + 1,
           tier: "pathway",
@@ -198,10 +202,11 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
     }),
   ]);
 
-  setRunStatus(runId, "completed", { completed_at: new Date().toISOString() });
+  await setRunStatus(runId, "completed", { completed_at: new Date().toISOString() });
 }
 
-async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>) {
+// Renamed from `pool` to avoid reading as the database connection pool.
+async function workerPool<T>(items: T[], n: number, fn: (item: T) => Promise<void>) {
   const queue = [...items];
   await Promise.all(
     Array.from({ length: Math.min(n, queue.length) }, async () => {

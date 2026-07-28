@@ -12,15 +12,18 @@ export async function GET(req: NextRequest) {
   const limitParam = Number(req.nextUrl.searchParams.get("limit") ?? 100);
   const limit = Number.isFinite(limitParam) ? limitParam : 100;
 
-  const runs = listRunCosts(orgId, limit);
-  const byOrg = costByOrg();
+  const [runs, byOrg, byModel] = await Promise.all([
+    listRunCosts(orgId, limit),
+    costByOrg(),
+    costByModel(),
+  ]);
   const body: CostSummary = {
     // Totals cover every run on record, not just the page being shown.
     total_cost: byOrg.reduce((n, r) => n + r.cost, 0),
     total_runs: byOrg.reduce((n, r) => n + r.runs, 0),
-    total_graded_calls: costByModel().reduce((n, m) => n + m.calls, 0),
+    total_graded_calls: byModel.reduce((n, m) => n + m.calls, 0),
     by_org: byOrg,
-    by_model: costByModel(),
+    by_model: byModel,
     runs,
   };
   return NextResponse.json(body);

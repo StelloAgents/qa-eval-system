@@ -12,7 +12,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { orgId: string } }
 ) {
-  const org = getOrg(params.orgId);
+  const org = await getOrg(params.orgId);
   if (!org) return NextResponse.json({ error: "org not found" }, { status: 404 });
 
   let raw;
@@ -25,7 +25,7 @@ export async function GET(
     );
   }
 
-  const customised = listCustomisedCaseIds(params.orgId);
+  const customised = await listCustomisedCaseIds(params.orgId);
 
   const cases: TestCaseSummary[] = raw.map((c) => {
     // Mirrors the runner's job selection: a case runs on the pathway tier

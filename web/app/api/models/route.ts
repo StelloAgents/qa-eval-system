@@ -46,13 +46,13 @@ const EST_COMPLETION_TOKENS = 40;
 /** Sum the prompt tokens this org would actually send: every pathway variant
  * gets one judge call, rendered from that case's own template and expected
  * outcome. KB-tier cases are excluded — they never call an LLM. */
-function estimateSuite(orgId: string, orgName: string) {
+async function estimateSuite(orgId: string, orgName: string) {
   let calls = 0;
   let promptTokens = 0;
   const today = nowString();
   for (const c of loadCases(orgId)) {
     if (c.untestable?.tier === "pathway") continue;
-    const template = getGraderPrompt(orgId, c.id) ?? DEFAULT_JUDGE_TEMPLATE;
+    const template = (await getGraderPrompt(orgId, c.id)) ?? DEFAULT_JUDGE_TEMPLATE;
     for (const variant of c.variants) {
       const truth = buildGroundTruth(c, variant);
       // Stand in for the agent's replies, which do not exist until the run.
@@ -76,7 +76,7 @@ function estimateSuite(orgId: string, orgName: string) {
 
 export async function GET(req: NextRequest) {
   const orgId = req.nextUrl.searchParams.get("org") ?? "";
-  const org = getOrg(orgId);
+  const org = await getOrg(orgId);
   if (!org) return NextResponse.json({ error: "unknown org" }, { status: 404 });
 
   let raw: any[];
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 
   let basis = { calls: 0, promptTokens: 0 };
   try {
-    basis = estimateSuite(orgId, org.org_name);
+    basis = await estimateSuite(orgId, org.org_name);
   } catch {
     // No case file yet — the picker still works, estimates just read as zero.
   }
@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
     })
     .sort((a, b) => a.est_cost_per_run - b.est_cost_per_run);
 
-  const selected = getJudgeModel(orgId);
+  const selected = await getJudgeModel(orgId);
   const body: ModelCatalogue = {
     org_id: orgId,
     selected: selected ?? DEFAULT_JUDGE_MODEL,

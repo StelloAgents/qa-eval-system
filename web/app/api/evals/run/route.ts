@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const org = getOrg(orgId);
+  const org = await getOrg(orgId);
   if (!org) return NextResponse.json({ error: "unknown org" }, { status: 404 });
   if (!org.is_active) {
     return NextResponse.json({ error: "org is not active" }, { status: 409 });
@@ -27,12 +27,12 @@ export async function POST(req: NextRequest) {
     );
   }
   // One active run per org — concurrent runs trip Bland's rate gate.
-  if (orgHasActiveRun(orgId)) {
+  if (await orgHasActiveRun(orgId)) {
     return NextResponse.json(
       { error: "a run is already in progress for this org" },
       { status: 409 }
     );
   }
-  const runId = startRun(orgId, tier);
+  const runId = await startRun(orgId, tier);
   return NextResponse.json({ run_id: runId, status: "queued" });
 }

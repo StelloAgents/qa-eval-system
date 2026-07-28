@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   // Never leak which env var holds the key to the client.
+  const orgs = await listOrgs();
   return NextResponse.json(
-    listOrgs().map(({ bland_api_key_env: _omit, ...org }) => org)
+    orgs.map(({ bland_api_key_env: _omit, ...org }) => org)
   );
 }

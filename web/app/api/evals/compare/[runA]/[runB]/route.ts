@@ -7,7 +7,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { runA: string; runB: string } }
 ) {
-  const cmp = compareRuns(params.runA, params.runB);
+  const cmp = await compareRuns(params.runA, params.runB);
   if (!cmp) {
     return NextResponse.json(
       { error: "one or both runs not found or empty" },

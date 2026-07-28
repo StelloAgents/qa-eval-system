@@ -6,8 +6,8 @@ import { DEFAULT_JUDGE_MODEL } from "@/lib/runner/judge";
 // org. DELETE reverts to the built-in default by removing the row.
 export const dynamic = "force-dynamic";
 
-function body(orgId: string) {
-  const selected = getJudgeModel(orgId);
+async function body(orgId: string) {
+  const selected = await getJudgeModel(orgId);
   return {
     org_id: orgId,
     model: selected ?? DEFAULT_JUDGE_MODEL,
@@ -20,17 +20,17 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { orgId: string } }
 ) {
-  if (!getOrg(params.orgId)) {
+  if (!(await getOrg(params.orgId))) {
     return NextResponse.json({ error: "org not found" }, { status: 404 });
   }
-  return NextResponse.json(body(params.orgId));
+  return NextResponse.json(await body(params.orgId));
 }
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: { orgId: string } }
 ) {
-  if (!getOrg(params.orgId)) {
+  if (!(await getOrg(params.orgId))) {
     return NextResponse.json({ error: "org not found" }, { status: 404 });
   }
   const payload = await req.json().catch(() => null);
@@ -41,17 +41,17 @@ export async function PUT(
       { status: 400 }
     );
   }
-  setJudgeModel(params.orgId, model);
-  return NextResponse.json(body(params.orgId));
+  await setJudgeModel(params.orgId, model);
+  return NextResponse.json(await body(params.orgId));
 }
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { orgId: string } }
 ) {
-  if (!getOrg(params.orgId)) {
+  if (!(await getOrg(params.orgId))) {
     return NextResponse.json({ error: "org not found" }, { status: 404 });
   }
-  clearJudgeModel(params.orgId);
-  return NextResponse.json(body(params.orgId));
+  await clearJudgeModel(params.orgId);
+  return NextResponse.json(await body(params.orgId));
 }
