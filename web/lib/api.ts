@@ -80,11 +80,15 @@ export const api = {
     getArray<EvalResult>(`/api/evals/run/${runId}/results`),
   compare: (runA: string, runB: string) =>
     getJson<CompareResult>(`/api/evals/compare/${runA}/${runB}`),
-  startRun: async (orgId: string, tier: RunTier): Promise<{ run_id: string; status: string }> => {
+  startRun: async (
+    orgId: string,
+    tier: RunTier,
+    maxTurns?: number
+  ): Promise<{ run_id: string; status: string }> => {
     const res = await fetch("/api/evals/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ org_id: orgId, tier }),
+      body: JSON.stringify({ org_id: orgId, tier, max_turns: maxTurns }),
     });
     if (!res.ok) throw new Error(`start run → ${res.status}`);
     return res.json();

@@ -16,6 +16,7 @@ import {
 import { EvalResult, RunTier } from "../types";
 import { kbChat, pathwayRun } from "./bland";
 import { DEFAULT_JUDGE_MODEL, grade, TestCase } from "./judge";
+import { pathwaySim } from "./sim";
 
 // Bland trips Cloudflare's rate gate (429 / "error code: 1015") at 6+ workers.
 const WORKERS = 4;
@@ -45,9 +46,18 @@ async function blandKeyFor(orgId: string): Promise<string> {
   return key;
 }
 
+/** Max caller-simulator follow-up turns for a pathway variant. 0 = single-turn
+ * (send only the opening line — the cheap baseline that mostly catches guardrail
+ * leaks); >0 drives a multi-turn conversation via the caller-simulator. */
+export const DEFAULT_MAX_TURNS = 6;
+
 /** Insert a queued run row and fire the execution in the background.
  * Returns the run_id once the row exists; the frontend polls for status. */
-export async function startRun(orgId: string, tier: RunTier): Promise<string> {
+export async function startRun(
+  orgId: string,
+  tier: RunTier,
+  maxTurns: number = DEFAULT_MAX_TURNS
+): Promise<string> {
   const runId = crypto.randomUUID();
   await createRun({
     run_id: runId,
@@ -64,7 +74,7 @@ export async function startRun(orgId: string, tier: RunTier): Promise<string> {
     // model setting is changed later.
     judge_model: (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL,
   });
-  const work = executeRun(runId, orgId, tier).catch(async (e) => {
+  const work = executeRun(runId, orgId, tier, maxTurns).catch(async (e) => {
     await setRunStatus(runId, "failed", {
       completed_at: new Date().toISOString(),
       error_message: String(e?.message ?? e),
@@ -85,7 +95,12 @@ export async function startRun(orgId: string, tier: RunTier): Promise<string> {
   return runId;
 }
 
-async function executeRun(runId: string, orgId: string, tier: RunTier) {
+async function executeRun(
+  runId: string,
+  orgId: string,
+  tier: RunTier,
+  maxTurns: number
+) {
   const org = await getOrg(orgId);
   if (!org) throw new Error(`unknown org ${orgId}`);
   const blandKey = await blandKeyFor(orgId);
@@ -170,11 +185,22 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
     workerPool(pathwayJobs, WORKERS, async ({ c, variantIdx }) => {
       const variant = c.variants[variantIdx];
       try {
-        const { chatId, exchanges } = await pathwayRun(
-          org.bland_pathway_id,
-          variant.turns,
-          blandKey
-        );
+        // maxTurns > 0 drives a multi-turn conversation with the caller-simulator
+        // so the agent can actually work the problem; 0 sends only the opening
+        // line (single-turn baseline). The simulator plays the caller for the
+        // follow-ups after the opener, hence variant.turns[0] as the opener.
+        const { chatId, exchanges, simUsage } =
+          maxTurns > 0
+            ? await pathwaySim(
+                org.bland_pathway_id,
+                c,
+                variant.turns[0],
+                blandKey,
+                openrouterKey!,
+                judgeModel,
+                maxTurns
+              )
+            : { ...(await pathwayRun(org.bland_pathway_id, variant.turns, blandKey)), simUsage: null };
         // Read the override per job rather than once up front, so a prompt
         // edited mid-run applies to cases that have not been graded yet.
         const { ok, notes, usage } = await grade(
@@ -186,6 +212,9 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           await getGraderPrompt(orgId, c.id),
           judgeModel
         );
+        // Fold the caller-simulator's OpenRouter spend into the grading cost:
+        // both are grading-side spend on the same model, and the schema has no
+        // separate column for it. Cost dashboards then reflect true spend.
         await save({
           ...base(c),
           variant_num: variantIdx + 1,
@@ -197,9 +226,10 @@ async function executeRun(runId: string, orgId: string, tier: RunTier) {
           chat_id: chatId,
           exchanges,
           judge_model: usage?.model ?? judgeModel,
-          judge_cost: usage?.cost ?? 0,
-          judge_prompt_tokens: usage?.prompt_tokens ?? 0,
-          judge_completion_tokens: usage?.completion_tokens ?? 0,
+          judge_cost: (usage?.cost ?? 0) + (simUsage?.cost ?? 0),
+          judge_prompt_tokens: (usage?.prompt_tokens ?? 0) + (simUsage?.prompt_tokens ?? 0),
+          judge_completion_tokens:
+            (usage?.completion_tokens ?? 0) + (simUsage?.completion_tokens ?? 0),
         });
       } catch (e: any) {
         await save({

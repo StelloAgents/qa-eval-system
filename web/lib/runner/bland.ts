@@ -82,54 +82,62 @@ export async function kbChat(
 
 // --- tier 2: pathway chat ----------------------------------------------------
 
-export async function pathwayRun(
-  pathwayId: string,
-  turns: string[],
-  apiKey: string
-): Promise<{ chatId: string; exchanges: Exchange[] }> {
-  // Prime the greeting, then send the real turns.
-  //
-  // Turn 1 is ALWAYS consumed by the pathway's Greeting node -- it replies with
-  // the scripted greeting regardless of what you send. So we burn one turn on
-  // "hello" and grade only what comes after. A harness that skips this grades
-  // the greeting and fails every case.
-  //
-  // {{now}} must be supplied or the node's payment-date arithmetic has no anchor.
-  // On a real call Bland injects {{now}} itself; the chat API does not, so we
-  // pass it. The parameter is `request_data`, NOT `variables`. A `variables`
-  // payload is silently ignored here -- accepted without error, never bound, no
-  // warning. That silence is what made this look like a broken agent rather
-  // than a missing input, so don't "simplify" this key.
+/** Create a pathway chat and burn the scripted greeting turn; returns chat id.
+ *
+ * Turn 1 is ALWAYS consumed by the pathway's Greeting node -- it replies with
+ * the scripted greeting regardless of what you send. So we burn one turn on
+ * "hello" and grade only what comes after. A harness that skips this grades
+ * the greeting and fails every case.
+ *
+ * {{now}} must be supplied or the node's payment-date arithmetic has no anchor.
+ * On a real call Bland injects {{now}} itself; the chat API does not, so we
+ * pass it. The parameter is `request_data`, NOT `variables`. A `variables`
+ * payload is silently ignored here -- accepted without error, never bound, no
+ * warning. That silence is what made this look like a broken agent rather
+ * than a missing input, so don't "simplify" this key. */
+export async function openPathwayChat(pathwayId: string, apiKey: string): Promise<string> {
   const created = await post(
     `${BLAND_API}/pathway/chat/create`,
     { pathway_id: pathwayId, request_data: { now: nowString() } },
     { authorization: apiKey }
   );
   const chatId = created.data.chat_id as string;
-
   await post(
     `${BLAND_API}/pathway/chat/${chatId}`,
     { message: "hello" },
     { authorization: apiKey }
   );
+  return chatId;
+}
 
+/** Send one caller turn and return the agent's reply + current node.
+ *
+ * NOTE: the send route is /pathway/chat/{chat_id}, NOT /pathway/chat. Posting
+ * to the bare path returns "Error checking pathway ownership", which reads like
+ * an auth failure but is really a wrong-route error. */
+export async function sendPathwayTurn(
+  chatId: string,
+  message: string,
+  apiKey: string
+): Promise<Exchange> {
+  const d = (
+    await post(`${BLAND_API}/pathway/chat/${chatId}`, { message }, { authorization: apiKey })
+  ).data;
+  return {
+    user: message,
+    assistant: ((d.assistant_responses as string[]) ?? []).join(" ").trim(),
+    node: d.current_node_name ?? null,
+  };
+}
+
+/** Single-turn-per-variant run: send each scripted turn, grade what comes back. */
+export async function pathwayRun(
+  pathwayId: string,
+  turns: string[],
+  apiKey: string
+): Promise<{ chatId: string; exchanges: Exchange[] }> {
+  const chatId = await openPathwayChat(pathwayId, apiKey);
   const exchanges: Exchange[] = [];
-  for (const turn of turns) {
-    // NOTE: the send route is /pathway/chat/{chat_id}, NOT /pathway/chat.
-    // Posting to the bare path returns "Error checking pathway ownership",
-    // which reads like an auth failure but is really a wrong-route error.
-    const d = (
-      await post(
-        `${BLAND_API}/pathway/chat/${chatId}`,
-        { message: turn },
-        { authorization: apiKey }
-      )
-    ).data;
-    exchanges.push({
-      user: turn,
-      assistant: ((d.assistant_responses as string[]) ?? []).join(" ").trim(),
-      node: d.current_node_name ?? null,
-    });
-  }
+  for (const turn of turns) exchanges.push(await sendPathwayTurn(chatId, turn, apiKey));
   return { chatId, exchanges };
 }

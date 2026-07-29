@@ -23,6 +23,20 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  // Optional: max caller-simulator follow-up turns for pathway variants. 0 =
+  // single-turn baseline. Ignored by the KB tier. Falls back to the runner
+  // default when omitted; capped so a typo can't launch a runaway conversation.
+  let maxTurns: number | undefined;
+  if (body?.max_turns != null) {
+    const n = Number(body.max_turns);
+    if (!Number.isInteger(n) || n < 0 || n > 20) {
+      return NextResponse.json(
+        { error: "max_turns must be an integer between 0 and 20" },
+        { status: 400 }
+      );
+    }
+    maxTurns = n;
+  }
   const org = await getOrg(orgId);
   if (!org) return NextResponse.json({ error: "unknown org" }, { status: 404 });
   if (!org.is_active) {
@@ -44,6 +58,6 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
-  const runId = await startRun(orgId, tier);
+  const runId = await startRun(orgId, tier, maxTurns);
   return NextResponse.json({ run_id: runId, status: "queued" });
 }

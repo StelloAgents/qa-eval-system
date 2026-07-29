@@ -32,6 +32,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -58,6 +59,9 @@ export function Dashboard() {
 
   const [orgs, setOrgs] = React.useState<EvalOrg[]>([]);
   const [tier, setTier] = React.useState<RunTier>("both");
+  // Max caller-simulator follow-up turns for the pathway tier. 0 = single-turn
+  // baseline; higher lets a multi-turn troubleshooting agent finish its flow.
+  const [maxTurns, setMaxTurns] = React.useState(6);
   const [runs, setRuns] = React.useState<EvalRun[] | null>(null);
   const [results, setResults] = React.useState<EvalResult[] | null>(null);
   const [compare, setCompare] = React.useState<CompareResult | null>(null);
@@ -102,7 +106,7 @@ export function Dashboard() {
   // --- run trigger + polling ----------------------------------------------
   async function startRun() {
     try {
-      const { run_id } = await api.startRun(orgId, tier);
+      const { run_id } = await api.startRun(orgId, tier, maxTurns);
       setLive({
         run_id,
         status: "queued",
@@ -203,6 +207,25 @@ export function Dashboard() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Turns
+            </label>
+            <Input
+              type="number"
+              min={0}
+              max={20}
+              value={maxTurns}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (Number.isInteger(n) && n >= 0 && n <= 20) setMaxTurns(n);
+              }}
+              // Only the pathway tiers converse; the KB tier is a single query.
+              disabled={!!running || tier === "kb"}
+              title="Max caller-simulator follow-up turns per pathway case. 0 = single turn (send only the opening line)."
+              className="w-[90px]"
+            />
           </div>
           <Button
             size="lg"
