@@ -102,7 +102,10 @@ export function CasesView() {
   const [category, setCategory] = React.useState("all");
 
   React.useEffect(() => {
-    api.listOrgs().then(setOrgs);
+    // Never leave this unguarded: a database outage makes every endpoint
+    // 500, and an unhandled rejection here takes the whole page down with
+    // a client-side exception instead of showing anything useful.
+    api.listOrgs().then(setOrgs).catch(() => setOrgs([]));
   }, []);
 
   React.useEffect(() => {

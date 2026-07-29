@@ -67,7 +67,9 @@ export function Dashboard() {
 
   // --- data loading -------------------------------------------------------
   const loadHistory = React.useCallback(async () => {
-    const rs = await api.listRuns(orgId, 5);
+    // An empty list renders the "no runs yet" state; an uncaught rejection
+    // would instead surface as a client-side exception on the whole page.
+    const rs = await api.listRuns(orgId, 5).catch(() => [] as EvalRun[]);
     setRuns(rs);
     const latest = rs[0];
     if (latest) {
@@ -84,7 +86,10 @@ export function Dashboard() {
   }, [orgId]);
 
   React.useEffect(() => {
-    api.listOrgs().then(setOrgs);
+    // Never leave this unguarded: a database outage makes every endpoint
+    // 500, and an unhandled rejection here takes the whole page down with
+    // a client-side exception instead of showing anything useful.
+    api.listOrgs().then(setOrgs).catch(() => setOrgs([]));
   }, []);
 
   React.useEffect(() => {
