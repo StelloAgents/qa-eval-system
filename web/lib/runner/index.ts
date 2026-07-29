@@ -56,7 +56,9 @@ export const DEFAULT_MAX_TURNS = 6;
 export async function startRun(
   orgId: string,
   tier: RunTier,
-  maxTurns: number = DEFAULT_MAX_TURNS
+  maxTurns: number = DEFAULT_MAX_TURNS,
+  /** Case ids to run; empty/undefined runs the org's whole suite. */
+  caseIds?: string[]
 ): Promise<string> {
   const runId = crypto.randomUUID();
   await createRun({
@@ -74,7 +76,7 @@ export async function startRun(
     // model setting is changed later.
     judge_model: (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL,
   });
-  const work = executeRun(runId, orgId, tier, maxTurns).catch(async (e) => {
+  const work = executeRun(runId, orgId, tier, maxTurns, caseIds).catch(async (e) => {
     await setRunStatus(runId, "failed", {
       completed_at: new Date().toISOString(),
       error_message: String(e?.message ?? e),
@@ -99,7 +101,8 @@ async function executeRun(
   runId: string,
   orgId: string,
   tier: RunTier,
-  maxTurns: number
+  maxTurns: number,
+  caseIds?: string[]
 ) {
   const org = await getOrg(orgId);
   if (!org) throw new Error(`unknown org ${orgId}`);
@@ -112,9 +115,14 @@ async function executeRun(
   const judgeModel = (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL;
   const allCases = loadCases(orgId);
 
+  // Restrict to the picked cases when a selection was passed; an empty or
+  // absent list means the whole suite.
+  const wanted = caseIds && caseIds.length ? new Set(caseIds) : null;
+  const selected = wanted ? allCases.filter((c) => wanted.has(c.id)) : allCases;
+
   // Cases that can't be graded on this channel are excluded, not failed --
   // leaving them in parks a permanent false FAIL that masks real regressions.
-  const testable = allCases.filter((c) => c.untestable?.tier !== tier);
+  const testable = selected.filter((c) => c.untestable?.tier !== tier);
 
   const pathwayJobs: { c: TestCase; variantIdx: number }[] = [];
   const kbJobs: TestCase[] = [];

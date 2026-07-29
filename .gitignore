@@ -54,3 +54,4 @@ web/data/
 web/evals/
 # root Python ignore has a bare `lib/` pattern; the web app's lib/ is source
 !web/lib/
+.vercel

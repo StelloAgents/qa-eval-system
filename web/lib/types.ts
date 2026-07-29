@@ -45,6 +45,32 @@ export interface JudgeModel {
   is_free: boolean;
 }
 
+/** Pre-run LLM cost estimate for a chosen scope (cases × tier × turns). All
+ * token/call figures and the dollar amount are approximations; when max_turns>0
+ * the amount is an upper bound, since real conversations often end early. */
+export interface EstimateResponse {
+  org_id: string;
+  tier: RunTier;
+  max_turns: number;
+  judge_model: string;
+  /** False when the judge model has no pricing in the OpenRouter catalogue;
+   * then est_cost is null and only the call/token counts are meaningful. */
+  pricing_known: boolean;
+  selected_cases: number;
+  /** Pathway variant runs across the selected cases. */
+  variants: number;
+  graded_calls: number;
+  sim_calls: number;
+  est_prompt_tokens: number;
+  est_completion_tokens: number;
+  /** Estimated USD, or null when pricing is unknown. */
+  est_cost: number | null;
+  /** True while max_turns>0 — the figure is a worst-case ceiling. */
+  is_upper_bound: boolean;
+  /** Pathway chat messages sent to Bland (billed separately; informational). */
+  bland_calls: number;
+}
+
 export interface ModelCatalogue {
   org_id: string;
   selected: string;

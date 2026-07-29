@@ -12,16 +12,20 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { CasePicker } from "@/components/case-picker";
 import {
   CompareResult,
+  EstimateResponse,
   EvalOrg,
   EvalResult,
   EvalRun,
   RunStatusResponse,
   RunTier,
+  TestCaseSummary,
 } from "@/lib/types";
 import { formatDateTime, passRate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,6 +56,17 @@ const TIER_OPTIONS: { value: RunTier; label: string }[] = [
   { value: "both", label: "Both tiers" },
 ];
 
+/** One-line cost/scope summary shown under the Run button. */
+function estimateLabel(e: EstimateResponse | null, tier: RunTier): string {
+  if (!e) return tier === "kb" ? " " : "estimating cost…";
+  if (!e.variants) return `${e.selected_cases} KB checks · no LLM cost`;
+  const calls = e.graded_calls + e.sim_calls;
+  const cost = e.est_cost != null
+    ? `${e.is_upper_bound ? "≤ " : ""}~$${e.est_cost.toFixed(e.est_cost < 0.1 ? 4 : 2)}`
+    : "cost unavailable";
+  return `Est. ${cost} · ${e.variants} variants · ${calls} LLM calls (${e.judge_model.split("/").pop()})`;
+}
+
 export function Dashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,6 +77,11 @@ export function Dashboard() {
   // Max caller-simulator follow-up turns for the pathway tier. 0 = single-turn
   // baseline; higher lets a multi-turn troubleshooting agent finish its flow.
   const [maxTurns, setMaxTurns] = React.useState(6);
+  // Case scope: which cases this run covers. Defaults to all once loaded.
+  const [cases, setCases] = React.useState<TestCaseSummary[] | null>(null);
+  const [selectedCases, setSelectedCases] = React.useState<Set<string>>(new Set());
+  const [showPicker, setShowPicker] = React.useState(false);
+  const [estimate, setEstimate] = React.useState<EstimateResponse | null>(null);
   const [runs, setRuns] = React.useState<EvalRun[] | null>(null);
   const [results, setResults] = React.useState<EvalResult[] | null>(null);
   const [compare, setCompare] = React.useState<CompareResult | null>(null);
@@ -103,10 +123,55 @@ export function Dashboard() {
     loadHistory();
   }, [loadHistory]);
 
+  // Load the org's case catalogue and start with everything selected, so the
+  // default run behaviour (whole suite) is unchanged.
+  React.useEffect(() => {
+    let live = true;
+    setCases(null);
+    setShowPicker(false);
+    api
+      .getOrgCases(orgId)
+      .then((c) => {
+        if (!live) return;
+        setCases(c.cases);
+        setSelectedCases(new Set(c.cases.map((x) => x.id)));
+      })
+      .catch(() => {
+        if (!live) return;
+        setCases([]);
+        setSelectedCases(new Set());
+      });
+    return () => {
+      live = false;
+    };
+  }, [orgId]);
+
+  // Live cost estimate, debounced so toggling cases or nudging the turn count
+  // doesn't fire a request per keystroke.
+  React.useEffect(() => {
+    if (!cases) return;
+    const ids = [...selectedCases];
+    if (!ids.length) {
+      setEstimate(null);
+      return;
+    }
+    setEstimate(null);
+    const t = setTimeout(() => {
+      api
+        .estimate(orgId, tier, maxTurns, ids)
+        .then(setEstimate)
+        .catch(() => setEstimate(null));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [orgId, tier, maxTurns, selectedCases, cases]);
+
   // --- run trigger + polling ----------------------------------------------
   async function startRun() {
     try {
-      const { run_id } = await api.startRun(orgId, tier, maxTurns);
+      // Send ids only when it's a real subset; all-selected runs the whole suite.
+      const ids = [...selectedCases];
+      const scope = cases && ids.length === cases.length ? undefined : ids;
+      const { run_id } = await api.startRun(orgId, tier, maxTurns, scope);
       setLive({
         run_id,
         status: "queued",
@@ -227,20 +292,46 @@ export function Dashboard() {
               className="w-[90px]"
             />
           </div>
-          <Button
-            size="lg"
-            onClick={startRun}
-            disabled={!!running || !org?.is_active}
-            className="sm:ml-auto"
-          >
-            {running ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Play />
-            )}
-            {running ? "Running…" : "Run Evals"}
-          </Button>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Cases
+            </label>
+            <Button
+              variant="outline"
+              onClick={() => setShowPicker((s) => !s)}
+              disabled={!!running || !cases}
+              className="w-[170px] justify-start font-normal"
+            >
+              <ListChecks className="text-muted-foreground" />
+              {cases
+                ? selectedCases.size === cases.length
+                  ? `All ${cases.length} cases`
+                  : `${selectedCases.size} of ${cases.length} cases`
+                : "Loading…"}
+            </Button>
+          </div>
+          <div className="flex flex-col gap-1 sm:ml-auto sm:items-end">
+            <Button
+              size="lg"
+              onClick={startRun}
+              disabled={!!running || !org?.is_active || selectedCases.size === 0}
+            >
+              {running ? <Loader2 className="animate-spin" /> : <Play />}
+              {running ? "Running…" : "Run Evals"}
+            </Button>
+            <span className="text-xs text-muted-foreground">{estimateLabel(estimate, tier)}</span>
+          </div>
         </CardContent>
+        {showPicker && cases && (
+          <div className="border-t px-6 py-4">
+            <CasePicker
+              cases={cases}
+              selected={selectedCases}
+              onChange={setSelectedCases}
+              disabled={!!running}
+            />
+          </div>
+        )}
 
         {/* Status strip */}
         {live && (

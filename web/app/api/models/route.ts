@@ -8,36 +8,12 @@ import {
   renderJudgePrompt,
 } from "@/lib/runner/judge";
 import { nowString } from "@/lib/runner/bland";
+import { estTokens, fetchModels } from "@/lib/openrouter";
 import { JudgeModel, ModelCatalogue } from "@/lib/types";
 
 // GET /api/models?org=<org_id> — grader models available on OpenRouter, with a
 // cost-per-run estimate for that org's suite.
 export const dynamic = "force-dynamic";
-
-const OPENROUTER_MODELS = "https://openrouter.ai/api/v1/models";
-
-// The catalogue is ~370 models and changes rarely; refetching per keystroke in
-// the picker would be wasteful and rate-limited.
-let cache: { at: number; data: any[] } | null = null;
-const TTL_MS = 10 * 60 * 1000;
-
-async function fetchModels(): Promise<any[]> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
-  const res = await fetch(OPENROUTER_MODELS, {
-    headers: { "user-agent": "qa-eval/1.0" },
-    signal: AbortSignal.timeout(30_000),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`OpenRouter models ${res.status}`);
-  const data = (await res.json())?.data ?? [];
-  cache = { at: Date.now(), data };
-  return data;
-}
-
-/** Rough token count. The judge prompt is English prose plus a transcript, for
- * which ~4 characters per token is a standard approximation — good enough to
- * rank models by cost, and labelled as an estimate in the UI. */
-const estTokens = (s: string) => Math.ceil(s.length / 4);
 
 /** Completion is one short JSON verdict; observed runs land near 30 tokens and
  * max_tokens caps it at 200. */

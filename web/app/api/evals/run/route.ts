@@ -37,6 +37,17 @@ export async function POST(req: NextRequest) {
     }
     maxTurns = n;
   }
+  // Optional: run only these case ids. Absent/empty runs the whole suite.
+  let caseIds: string[] | undefined;
+  if (body?.case_ids != null) {
+    if (!Array.isArray(body.case_ids) || body.case_ids.some((c: unknown) => typeof c !== "string")) {
+      return NextResponse.json(
+        { error: "case_ids must be an array of strings" },
+        { status: 400 }
+      );
+    }
+    caseIds = body.case_ids as string[];
+  }
   const org = await getOrg(orgId);
   if (!org) return NextResponse.json({ error: "unknown org" }, { status: 404 });
   if (!org.is_active) {
@@ -58,6 +69,6 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
-  const runId = await startRun(orgId, tier, maxTurns);
+  const runId = await startRun(orgId, tier, maxTurns, caseIds);
   return NextResponse.json({ run_id: runId, status: "queued" });
 }

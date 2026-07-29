@@ -33,19 +33,14 @@ const ENDING_TEXT =
 const isEnding = (assistant: string, node: string | null | undefined): boolean =>
   (!!node && ENDING_NODE.test(node)) || ENDING_TEXT.test(assistant ?? "");
 
-/** One caller turn from the simulator, given the conversation so far. Accumulates
- * its OpenRouter usage into `usage`. */
-async function callerReply(
-  testCase: TestCase,
-  exchanges: Exchange[],
-  openrouterKey: string,
-  model: string,
-  usage: SimUsage
-): Promise<string> {
+/** The caller-simulator prompt for the next turn, given the conversation so far.
+ * Exported so the pre-run cost estimate can size it exactly as the runner sends
+ * it, keeping the two from drifting. */
+export function buildCallerPrompt(testCase: TestCase, exchanges: Exchange[]): string {
   const transcript = exchanges
     .map((e) => `${e.user ? `Caller: ${e.user}\n` : ""}Agent: ${e.assistant}`)
     .join("\n");
-  const prompt = `You are role-playing a non-technical employee who called IT support. Your problem, in your own words: "${testCase.name}". You already opened with: "${exchanges[0].user}".
+  return `You are role-playing a non-technical employee who called IT support. Your problem, in your own words: "${testCase.name}". You already opened with: "${exchanges[0].user}".
 
 Rules for your reply:
 - Speak as the caller, first person, 1-2 short sentences. Never speak or think for the agent.
@@ -58,7 +53,18 @@ Conversation so far:
 ${transcript}
 
 Your next reply as the caller:`;
+}
 
+/** One caller turn from the simulator, given the conversation so far. Accumulates
+ * its OpenRouter usage into `usage`. */
+async function callerReply(
+  testCase: TestCase,
+  exchanges: Exchange[],
+  openrouterKey: string,
+  model: string,
+  usage: SimUsage
+): Promise<string> {
+  const prompt = buildCallerPrompt(testCase, exchanges);
   const d = await post(
     OPENROUTER_API,
     {

@@ -3,6 +3,7 @@ import {
   EvalOrg,
   EvalResult,
   CostSummary,
+  EstimateResponse,
   EvalRun,
   GraderPrompt,
   ModelCatalogue,
@@ -80,15 +81,35 @@ export const api = {
     getArray<EvalResult>(`/api/evals/run/${runId}/results`),
   compare: (runA: string, runB: string) =>
     getJson<CompareResult>(`/api/evals/compare/${runA}/${runB}`),
+  estimate: async (
+    orgId: string,
+    tier: RunTier,
+    maxTurns: number,
+    caseIds: string[]
+  ): Promise<EstimateResponse> => {
+    const res = await fetch("/api/evals/estimate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ org_id: orgId, tier, max_turns: maxTurns, case_ids: caseIds }),
+    });
+    if (!res.ok) throw new Error(`estimate → ${res.status}`);
+    return res.json();
+  },
   startRun: async (
     orgId: string,
     tier: RunTier,
-    maxTurns?: number
+    maxTurns?: number,
+    caseIds?: string[]
   ): Promise<{ run_id: string; status: string }> => {
     const res = await fetch("/api/evals/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ org_id: orgId, tier, max_turns: maxTurns }),
+      body: JSON.stringify({
+        org_id: orgId,
+        tier,
+        max_turns: maxTurns,
+        case_ids: caseIds,
+      }),
     });
     if (!res.ok) throw new Error(`start run → ${res.status}`);
     return res.json();
