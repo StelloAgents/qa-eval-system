@@ -1,0 +1,669 @@
+# Microsoft 365 & Windows — End User Support Knowledge Base
+
+**Version:** 2.0 · 29 July 2026
+**Supersedes:** KB_Microsoft365_Trimmed.txt
+**Scope:** Microsoft Teams, Outlook (desktop and mobile), Outlook Calendar,
+OneDrive, Word / Excel / PowerPoint, Windows, BitLocker, and suspicious-message
+handling. Built from Compugen's July 2026 scoping guidance and verified against
+Microsoft support documentation.
+
+<critical_accuracy_rule>
+This knowledge base is the only source of truth for every fact the agent gives on a call: menu paths, button names, settings locations, file paths, size and storage limits, retention periods, keyboard shortcuts, icon meanings, and policies. Every path, name, limit, and step the agent says must come from this document exactly as written. Never invent, round, estimate, or guess a menu location, setting, limit, or fix. If the answer to a caller's question is not in this document, the agent says it doesn't have that on hand and offers to route the caller to the IT team — it does not improvise a fix or stitch one together from unrelated sections.
+
+Where this document states no limit, the agent states no limit. Do not supply a number from general knowledge.
+</critical_accuracy_rule>
+
+<permissions_and_scope_rule>
+The caller is a standard user with no administrative rights. The agent must never recommend, walk through, or suggest any action that requires admin rights or changes a machine/tenant at a system level. The agent must NOT recommend:
+
+- Installing, uninstalling, reinstalling, repairing, resetting, or updating any software or app
+- Running repair/recovery tools (Inbox Repair Tool, Microsoft Support and Recovery Assistant, PowerShell, SFC, DISM)
+- Creating, recreating, or repairing an Outlook profile; changing Cached Exchange Mode
+- Clearing cached credentials in Credential Manager
+- Turning off, disabling, or uninstalling OneDrive
+- Anything in the Teams admin center or any admin policy change
+- Starting in Safe Mode / advanced startup / changing Windows startup settings
+- Creating, removing, or changing user accounts
+- Editing the registry or starting/stopping Windows services
+- Editing file security permissions (Properties > Security tab)
+- Anything gated behind a paid license or an org/tenant policy the caller cannot change
+
+If the only remaining fix falls into the above categories, the agent routes to IT without attempting it. User-safe steps in this document are the full extent of what the agent walks a caller through.
+</permissions_and_scope_rule>
+
+<escalation_paths>
+This knowledge base has three ways a call can end. The agent must use the one named in the entry.
+
+**RESOLVED ON CALL** — the agent completed the fix or gave the correct explanation, and no handoff is needed. The agent confirms the caller is satisfied and closes.
+
+**ROUTE TO IT** — the fix is admin-gated or the problem is not resolvable by phone. A ticket is raised. The caller does not stay on the line. Collect the items under "What to Collect Before Routing" first.
+
+**WARM TRANSFER** — the caller stays on the line and is handed live to an agent. Used only where a delay causes real harm: a caller locked out of their device, or a possible security compromise in progress. The agent explains it is connecting them to someone now, and does not attempt further troubleshooting first.
+
+Only two entries in this document use WARM TRANSFER: BitLocker recovery prompt, and a suspicious message where the caller has already clicked, downloaded, or entered information.
+</escalation_paths>
+
+---
+
+# Microsoft Outlook — Mail Flow
+
+### I am not receiving expected email
+
+1. Confirm whether no email at all is arriving, or only messages from one sender
+2. Search using the sender's name, address, or subject
+3. Check the **Junk Email** folder. If the message is there, right-click it and choose **Mark as not junk**
+4. Check **Deleted Items** and **Archive**
+5. If Focused Inbox is on, check the **Other** tab — the message may not be in Focused
+6. Check whether the message list is filtered. Select **Filter** above the message list and choose **All**
+7. Ask whether the caller has set up any inbox rules or sweep rules. If yes → **Route to IT** (see note below)
+8. Open Outlook on the web and look for the message there
+9. Ask the sender to send a simple test email
+
+**Once the sender is identified:** adding them to the Safe Senders list prevents future messages going to Junk.
+
+**Note on rules:** the agent does not walk a caller through editing inbox rules by voice. A mis-edited rule silently misroutes mail the caller has not called about yet, and neither party can see it happen on the call. Ask whether rules exist; route if they do.
+
+**Route to IT if:** the message is not in any folder and rules are involved, or forwarding is suspected.
+
+### Email is missing, disappearing, or appearing in the wrong folder
+
+1. Search **All Mailboxes** using the sender or subject
+2. Check **Deleted Items**. If the message is there, select it and choose **Restore**
+3. Check **Junk Email**. If the message is there, select it and choose **Report** > **Not junk**
+4. Check **Archive**, and the **Other** tab if Focused Inbox is on
+5. Expand the conversation — the message may be grouped under another email
+6. If it is in none of those, check the Recoverable Items folder: select the **Deleted Items** folder, then **Recover items deleted from this folder**
+7. Ask whether any inbox rules are in place. If yes → **Route to IT**
+
+**Route to IT if:** the item is not in Recoverable Items. Past that point it is a compliance restore.
+
+### Outlook is not showing current messages or folders
+
+1. Confirm the device has internet access
+2. Check the status bar at the bottom of the Outlook window for **Working Offline**, **Disconnected**, **Trying to connect**, or **Updating**. All of these mean Outlook is not talking to the server
+3. If it shows Working Offline: on the **Send/Receive** tab, select **Work Offline**. Check the status bar again. This is a toggle — repeat until the status changes to connected
+4. Close and reopen Outlook
+5. Determine whether one folder or the whole mailbox is affected
+6. Open Outlook on the web. If mail is current there, the mailbox is healthy and the problem is the desktop client
+7. Restart the device
+
+**Tell the caller:** when the connection is restored Outlook synchronises automatically and the server copy and local copy become identical again. Nothing is lost while disconnected.
+
+**Route to IT if:** the status will not change to connected after a restart.
+
+### The recipient is not receiving the email I sent
+
+1. Confirm the message appears in **Sent Items** rather than the **Outbox**. A message in the Outbox never left the computer; a message in Sent Items left and the problem is downstream
+2. Check for a delivery-failure or bounce-back message. If one exists, have the caller read the error text and any code verbatim
+3. Confirm the recipient's address was correct before sending
+4. Determine whether internal, external, or all recipients are affected
+5. Send a plain test message without an attachment
+
+**Route to IT if:** a bounce-back exists — route with the exact error text. Do not troubleshoot the recipient's mail system.
+
+### Email is stuck in the Outbox or takes too long to send
+
+1. Check the status bar for **Working Offline**. If present, go to the **Send/Receive** tab and select **Work Offline** to toggle it back
+2. Confirm the device has internet access by loading any website
+3. Check whether the affected message has a large attachment
+4. Close and reopen Outlook
+5. Try moving or deleting the stuck message, then send a new test message
+6. Restart the device
+
+**Route to IT if:** messages still will not leave the Outbox after a restart.
+
+---
+
+# Microsoft Outlook — Mailbox and Application
+
+### My mailbox is full or near capacity
+
+1. Empty the **Deleted Items** folder
+2. Empty the **Junk Email** folder
+3. Sort messages by size and remove unnecessary large messages
+4. Review large items in **Sent Items** — sent attachments are a common cause
+5. For attachments worth keeping, save them to OneDrive or a folder on the device, then delete the original message
+6. Empty **Deleted Items** again after the cleanup
+
+**Important:** deleted items still count against the quota until Deleted Items is emptied. Step 6 is not optional.
+
+**Mailbox Cleanup tool** (if the caller is on classic Outlook): **File** > **Tools** > **Mailbox Cleanup**. Shows total mailbox size and per-folder sizes, and finds items older than a date or larger than a size.
+
+**The agent does not state a mailbox size limit.** No figure is confirmed for this environment.
+
+**Do not** walk the caller into AutoArchive or creating a .pst archive file.
+
+**Route to IT if:** cleanup does not get the caller under quota — a quota increase is an admin action.
+
+### Outlook will not open, freezes, or stops responding
+
+1. Check the status bar. Outlook may be running a background process. Wait two or three minutes to see if it recovers on its own — this costs nothing and often works
+2. If it is still frozen, close it: right-click **Start** > **Task Manager** > select **Microsoft Outlook** > **End task**. Confirm it closes, then close Task Manager and reopen Outlook normally
+3. Restart the device
+4. Ask whether Outlook freezes immediately, or only when opening a particular message, folder, or attachment
+5. If one specific item causes it, open or delete that item through Outlook on the web instead — this bypasses the desktop client entirely
+
+**Route to IT if:** Outlook freezes immediately on every launch. The next step is safe mode and add-in work, which is admin-gated.
+
+### An attachment will not open, download, or preview
+
+1. Confirm the attachment type and file name **first** — this decides everything that follows
+2. If the file type is blocked: Outlook blocks file extensions that can carry viruses, such as .exe, .bat, and .msi. The caller will see a message at the top of the email saying access was blocked. **This cannot be worked around by the caller.** The sender must compress the file into a .zip and resend. Explain this and close — no further steps apply
+3. Test another attachment to see whether the problem is one file or all files
+4. Save the attachment to the device before opening: select the dropdown arrow next to the attachment > **Save As** > choose a location > open it from there
+5. If a PDF will not preview, the device may have no default PDF handler. Go to Windows **Settings** > **Change default apps** and set **Microsoft Edge** as the default for PDF files. This requires no admin rights
+6. Try opening the attachment through Outlook on the web
+7. Ask the sender to resend the file or provide it in another format
+
+**Note:** attachments embedded in the message body cannot be previewed at all — they must be opened. This is expected behaviour, not a fault.
+
+**Do not** tell the caller to install Adobe Acrobat Reader. Setting Edge as the default PDF app achieves the same result with no install.
+
+**Route to IT if:** the caller needs a blocked file type unblocked — that is a tenant policy change.
+
+---
+
+# Outlook Mobile
+
+### Email is not updating on my phone
+
+1. Confirm whether email is current in Outlook on the web. If it is, the mailbox is healthy and the problem is the phone
+2. Check the phone's Wi-Fi or cellular connection
+3. Pull down on the message list to refresh
+4. Fully close and reopen the Outlook app
+5. Restart the phone
+
+**Ask if the caller also mentions calendar or contacts:** an account added as IMAP or POP cannot sync calendar or contacts at all — only Exchange ActiveSync does. If mail syncs but calendar never has, this is likely the cause. → **Route to IT** (re-adding the account is an admin action)
+
+**Also check:** if the mailbox is full, send and receive stop on mobile too. See "My mailbox is full or near capacity"
+
+**The agent does not give menu paths inside the mobile app.** No in-app navigation is confirmed for this document. Keep to the plain-language steps above.
+
+**Route to IT if:** the five steps do not resolve it. Resetting or removing the account is admin-gated.
+
+---
+
+# Outlook Calendar
+
+### My calendar is not synchronizing across desktop, web, or mobile
+
+1. Compare the event in Outlook on the web, desktop Outlook, and mobile
+2. Identify which version is incorrect — this establishes the direction of the failure and is what IT needs
+3. Confirm the correct calendar is selected
+4. Refresh or restart the affected application
+5. Create a small test appointment and check whether it appears on the other devices
+6. Restart the affected device
+
+**Ask:** was the account added as IMAP or POP? Those cannot sync calendar data at all. → **Route to IT**
+
+**Route to IT if:** the test appointment does not propagate. Clearing offline items and re-adding the account are both out of scope.
+
+### Availability or free/busy information is unavailable
+
+1. **Ask first: is the person inside or outside Compugen?** Outlook cannot show free/busy or scheduling information for someone who is not part of your organization. If the attendee is external, this is expected behaviour and there is no fault to fix — explain and close. **Resolved on call**
+2. Confirm whether the problem affects one person or everyone
+3. Check the **From** field on the meeting. If it is set to a non-organizational address, free/busy will not resolve. Change it to the work account
+4. If a large distribution list is being used, expand the list so Outlook can resolve individual attendees
+5. If the meeting has a very large number of attendees, split it into smaller meetings — Outlook has a limit on how many attendees it will show free/busy for
+6. Test availability in Outlook on the web
+7. Confirm the correct date and time zone are being viewed
+8. Create a new meeting and add the person again
+9. Record the affected users and date range
+
+**The agent does not state the attendee limit number.** Microsoft documents that a limit exists but not its value.
+
+**Route to IT if:** the attendee is internal, the From address is correct, and free/busy still does not resolve. The cause is usually calendar permissions on the other person's mailbox, which neither the caller nor the agent can change.
+
+---
+
+# Word, Excel and PowerPoint
+
+### A file will not open
+
+1. Confirm whether other files open normally
+2. **Open the Office application first, then open the file from inside it:** start Word, Excel, or PowerPoint, then **File** > **Open** > browse to the file. This bypasses broken file associations entirely and is the most reliable single step in this entry
+3. Confirm the file extension matches the expected application
+4. Ask where the file came from — email, Teams, SharePoint, or a local folder
+5. Save a local copy and try again
+6. If the file is on a mapped drive, a network path, or a URL, check the path length. Office fails to open files where the full path plus file name plus extension exceeds:
+   - **259 characters** for Word, PowerPoint and Access
+   - **218 characters** for Excel
+   Fix: move the file to a folder with a shorter path, or rename the containing folders
+7. Try opening the file through the corresponding web application
+8. If the file appears damaged, try Open and Repair **on the local copy from step 5**: **File** > **Open** > **Browse** > select the file > select the arrow on the **Open** button > **Open and Repair**
+9. Ask the sender to resend it if only that one file fails
+
+**Route to IT if:** all Office files fail to open. The remaining fixes are Office repair and file-association resets, both admin-gated.
+
+### Excel freezes, crashes, or stops responding
+
+1. Confirm whether it happens with every workbook or only one
+2. Open a blank workbook to test whether the application itself is healthy
+3. Save the affected workbook locally and reopen it. If it was on a network or SharePoint location, this also tests whether the location is the problem
+4. Close other unnecessary applications to free resources
+5. Try opening the workbook in Excel on the web
+6. If a heavy workbook is usable but slow, switching calculation to manual on the **Formulas** tab can make it workable
+
+**Ask, if only one workbook is affected:** is it very large, or heavily copy-pasted from other workbooks? Known causes include formulas referencing entire columns, large numbers of hidden or zero-size objects, excessive styles from copy-pasting between workbooks, and excessive invalid defined names. The agent cannot fix these by phone, but naming them gives IT a useful starting point.
+
+**Route to IT if:** every workbook crashes. Safe mode, add-in management and Office repair are all barred.
+
+### A file opens read-only, in the wrong application, or incorrectly
+
+1. **Check for Protected View first.** If there is a yellow information bar at the top of the document, select **Enable Editing**. This is the most common cause and it is a single click. Protected View is triggered by files from the internet, email attachments, and other locations Office treats as unsafe
+2. Confirm where the file was opened from
+3. Check the file's own attribute: right-click the file > **Properties** > untick the **Read-only** checkbox > **OK**
+4. If the file is shared, someone else may have it open for editing — save a copy, or wait
+5. If the file was marked as Final by its author, save a copy to edit
+6. If OneDrive storage is full, nothing can be saved until the caller is back under quota. Select the OneDrive icon in the notification area > **Manage storage**. See also "What do I do if my OneDrive says it's full?"
+7. If the file opened in the wrong application: open the correct Office application first, then **File** > **Open** and select the file from there
+8. Try the web version
+
+**Route to IT if:** Office is not activated or the subscription has expired — this puts Office into read-only mode and is a licensing fix. Also route if antivirus is blocking edits.
+
+---
+
+# Microsoft Teams
+
+### I cannot join a Teams meeting
+
+1. Confirm the meeting date and time
+2. Ask whether the caller is being held in a lobby — some organizers admit attendees manually. If so they are waiting, not stuck. **Resolved on call**
+3. Ask the user to reopen the original invitation and select the meeting link again
+4. On a **desktop**, copy and paste the link into a browser. On a **phone or tablet this will not work** — Teams meetings are not supported in mobile web browsers, and the caller must use the Teams mobile app
+5. Try joining through Teams on the web
+6. Confirm the caller is signed in with their work or school account. Some meetings require it and will reject an anonymous or personal-account join
+7. Confirm whether other Teams meetings work
+8. Ask whether the error occurs before or after selecting **Join now** — this separates a link or permission problem from a media or connection problem
+9. If the caller is the meeting organizer and there is no join option at all, the invite may never have had a meeting attached: open the meeting details from the Teams calendar and turn on the **Teams meeting** toggle
+
+**Route to IT if:** the meeting is locked by the organizer, has end-to-end encryption enabled, the lobby is full, or an org policy is blocking the join. Refer the caller to the organizer where it is an organizer-side setting.
+
+### Nobody can hear me
+
+1. Confirm the caller is not muted in Teams. In meeting controls, a mic icon with a line through it means muted — select **Unmute mic**
+2. Check for a physical mute: a headset boom in the upright position, or a hardware mute button on the device
+3. Disconnect and reconnect the headset
+4. Open **Settings** > **Devices** and, under Audio settings, select the expected microphone from the **Microphone** dropdown
+5. Speak and check whether the microphone level moves
+6. **Check Windows microphone permissions.** Go to **Settings** > **Privacy & security** > **App permissions** > **Microphone**. Four toggles must be on:
+   - **Microphone access**
+   - **Let apps access your microphone**
+   - **Microsoft Teams (work or school)**
+   - **Let desktop apps access your microphone**
+   This needs no admin rights and is a common cause after a Windows update
+7. Perform a Teams test call where available: **Make a test call**. Note this is English-only and is not available on Teams web
+8. If the mic is not listed in the dropdown at all, unplug and replug it. For Bluetooth, confirm it is charged and not connected to another device
+9. Try the device's built-in microphone
+
+**If the caller needs to stay in the meeting while this is unresolved:** the **Call me back** option dials their phone and joins audio that way.
+
+**Route to IT if:** none of the above works. Driver updates are admin-gated.
+
+### I cannot hear other participants or my headset is not working
+
+1. Check the device volume and the headset volume
+2. Confirm the headset is not muted
+3. Disconnect and reconnect it
+4. Select the expected speaker in Teams:
+   - **Before a meeting:** **Settings and more** > **Settings** > **Devices** > **Audio** > **Audio settings** > confirm the device under **Speaker**
+   - **During a meeting:** select the dropdown arrow next to **Mic** > **More actions** > **Audio settings** > confirm the device under **Speaker** and that it is not muted
+5. Check Windows sound output: **Start** > search **Sound settings** > **System** > **Sound** > under "Choose where to play sound", select the speaker and confirm it is unmuted next to **Volume**
+6. Test sound in another application
+7. Perform a Teams test call where available: **Make a test call**. Not available on Teams web
+8. If the device is missing from the dropdown, reconnect it if wired, or confirm it is charged if Bluetooth
+9. Try the device's built-in speaker
+
+**Route to IT if:** audio fails in all applications, not just Teams.
+
+### My camera does not work
+
+1. Confirm video is turned on in the meeting
+2. Close all other apps that might be using the camera
+3. Check whether a physical privacy cover or shutter is closed
+4. Open **Settings** > **Devices** and select the correct camera from the **Camera** dropdown
+5. If the preview is black, switch to another camera in the dropdown and then switch back — this forces a refresh
+6. **Check Windows camera permissions.** Go to **Settings** > **Privacy & security** > **Camera**. Turn **Let apps access your camera** on, then find **Microsoft Teams (work or school)** and turn it on. **If it is already on, turn it off and back on again** — this is a documented fix
+7. Disconnect and reconnect an external camera; try a different USB port
+8. Restart Teams and test the preview again
+9. Make a test call to confirm video before rejoining: **Settings** > **Devices** > **Make a test call**
+
+**Route to IT if:** the camera is not detected at all, or the device is a VDI session.
+
+### Calls keep dropping or audio/video quality is poor
+
+1. Determine whether one meeting or all calls are affected
+2. **Check with the other participants.** The problem may be at their end — this stops the agent troubleshooting a connection that is fine
+3. Use a wired connection where available, or move closer to the wireless access point
+4. If on Wi-Fi, minimise the number of walls and ceilings between the router and the device. Moving the router to a central location helps
+5. Stop large downloads or streaming activity on the network
+6. Close unnecessary applications
+7. Turn off video temporarily and test audio-only
+8. Rejoin the meeting
+9. Try another headset or the device's built-in audio
+10. If the problem is persistent and home-network related, an online speed test will show whether the connection matches what the internet provider should be delivering
+
+**Route to IT if:** quality is poor across all users or on the corporate network. QoS, VPN and firewall configuration are IT-side.
+
+### The Teams meeting button or meeting-link option is missing from Outlook
+
+1. Confirm Teams opens normally
+2. Confirm the caller is signed in to **both** Outlook and Teams with the **same work or school account**
+3. Fully close Teams and Outlook. Right-click the Teams icon in the system tray and select **Quit**
+4. Open Teams first and wait until it has fully loaded and signed in
+5. Open Outlook and check the calendar again
+6. Try creating the meeting directly in Teams
+7. Test meeting creation through Outlook on the web
+
+**Note on versions:** in new Outlook there is no separate add-in — a Teams meeting **toggle** appears in the event window once the caller is signed in to both with the same work account and is using the new Teams client. Do not send a caller hunting for an add-in button that does not exist in their version.
+
+**Route to IT if:** the above sequence does not restore it. Add-in management and reinstalling the Teams Meeting Add-in are both barred.
+
+### Teams is acting up in my browser, nothing loads right
+
+1. Confirm internet access
+2. Refresh the page, or open Teams in a private/incognito window
+3. Clear the browser cache, or try a different browser
+4. Sign out and back in
+5. Restart the browser
+
+### I can't find the chat for my meeting
+
+- During a meeting, select **Chat** in the meeting controls to access the conversation
+- The chat is specific to that meeting and is searchable
+
+---
+
+# OneDrive
+
+### OneDrive is not synchronizing
+
+1. Check the OneDrive cloud icon in the notification area. If no icon is visible at all, OneDrive may not be running
+2. If it shows as paused, right-click the icon and select **Resume syncing**. Ask whether the caller paused it recently — pause options are 2, 8, or 24 hours, so a pause set yesterday can still be active
+3. Confirm internet access
+4. Open OneDrive on the web and check whether the files are current there
+5. Close any files that may still be open. A file open in an application cannot sync until it is saved and the application is closed
+6. Close and reopen OneDrive
+7. Restart the device
+
+**Also check:** if OneDrive storage is full, uploading, editing and syncing all stop. See "What do I do if my OneDrive says it's full?"
+
+**Route to IT if:** the above does not resolve it. Repair and Reset OneDrive are both admin-gated.
+
+### OneDrive is stuck on "Processing changes" or "Sync pending"
+
+1. Identify the file showing the warning
+2. Close the file and its application
+3. Ask whether a large number of files were added to OneDrive at once. If so the correct action is to wait — this resolves itself
+4. Ask whether one very large file is involved. Large ZIP archives, videos, and Outlook data files are known causes
+5. Check whether the file name is unusually long or contains unusual characters — see "OneDrive restrictions and limitations" for the exact limits
+6. Confirm the caller is still signed in to OneDrive. A lapsed sign-in or a recent password change presents identically to a stuck sync
+7. Pause and resume synchronization
+8. Move the file temporarily outside the OneDrive folder, then return it
+9. Restart OneDrive
+
+**Route to IT if:** sync is still stuck after a restart, or a re-link is needed.
+
+### A specific file will not synchronize, open, or edit
+
+1. Confirm whether other OneDrive files work
+2. **Close the file everywhere.** A file in use by an application cannot sync while it is open. This is the primary cause of this error — once the file is saved and the application closed, OneDrive syncs it
+3. Test the file through OneDrive on the web
+4. Save a copy with a shorter, simpler name — see "OneDrive restrictions and limitations"
+5. Try uploading the file directly through OneDrive on the web
+
+**Do not** instruct the caller to delete the original file, and **do not** walk them through the file's Security tab permissions.
+
+**Route to IT if:** the file still will not sync. The remaining documented cause is a file permissions problem, which is out of scope.
+
+### Files are missing or not visible on the device
+
+1. Confirm the correct OneDrive folder is being viewed
+2. Confirm the caller is signed in to the correct account — personal versus work/school. Files may be sitting safely in another OneDrive
+3. Search OneDrive on the web using **Search everything** at the top of the page. Suggest searching by description, date or place, not only the file name
+4. **Check whether the item is visible online but not in File Explorer.** If so this is a local sync problem, not a lost file — work the sync entries above instead
+5. Check the **Recycle bin** on the OneDrive website: select it on the left, select the file, then **Restore** at the top. For work or school accounts, items are deleted from the recycle bin after **93 days**
+6. Check the Personal Vault if the caller uses one — vault files do **not** appear in search results. In the recycle bin, select **Show Personal Vault items**
+7. Check File Explorer on the device, and the device's own Recycle Bin
+8. Restart OneDrive
+
+**Route to IT if:** the file is past the 93-day recycle bin window, or a point-in-time restore is needed. Version history and Files Restore are out of scope for phone support.
+
+### OneDrive restrictions and limitations
+
+- File upload/download limit: **250GB** per file
+- Path length limit: **400 characters** total (file name plus full folder path)
+- File/folder name length: **255 characters** maximum per segment
+- Invalid characters in names: `" * : < > ? / \ |`
+- Number of items: up to **2,500** items can be copied at once; best performance with under **300,000** total items synced
+
+*These figures support the sync entries above. Do not remove this entry.*
+
+### Unlink and re-link OneDrive
+
+This is a user-safe reset that does not delete files:
+- Right-click the OneDrive icon on the taskbar > **Settings** > **Account** > **Unlink this PC** > **Unlink account**
+- Sign in again to re-link
+- Files stay in OneDrive; local folders are briefly disconnected during the process
+- No data is lost — all files sync back once linking is complete
+
+### Fix problems uploading at OneDrive.com
+
+1. Confirm internet access
+2. Check remaining storage — if full, delete unnecessary files first
+3. Confirm the file does not exceed **250GB**
+4. Confirm the full file path does not exceed **400 characters**
+5. Rename files to remove invalid characters: `" * : < > ? / \ |`
+6. Try uploading a small test file first
+7. Close the browser and try again
+
+### Unable to share OneDrive files
+
+1. Confirm the caller has Edit permission on the file
+2. Right-click the file > **Share**
+3. Enter the recipient's email address
+4. Set permissions (**Can Edit** or **Can View**)
+5. Select **Share**
+
+**Route to IT if:** sharing is blocked by org policy.
+
+### What do the OneDrive icons mean?
+
+- **Blue circle with "i"**: Informational message about using OneDrive or new features
+- **Red circle with white cross**: A file or folder cannot be synced — select the icon for details
+- **Gray/faded cloud icon with line**: Not signed in or setup not complete
+- **Circular sync arrows**: Sync is in progress
+- **Green circle with check mark**: File is downloaded and available offline
+- **Blue cloud outline**: File is online-only (does not take space on device)
+- **Blue cloud with person icon**: File or folder is shared with others
+
+### What do I do if my OneDrive says it's full?
+
+1. Confirm the storage quota is exceeded
+2. Delete unnecessary files, then empty the Recycle Bin — deleted files still count until the bin is emptied
+3. Move large files to another storage location
+
+**Route to IT if:** the caller needs a quota increase, or sees an "Your account is currently unavailable" message.
+
+**The agent does not state a OneDrive storage figure.** No quota is confirmed for this environment.
+
+### Reinstalling, resetting, or version errors
+
+- **Reinstalling OneDrive** → **Route to IT.** Requires administrator rights
+- **Resetting OneDrive** → **Route to IT.** Requires administrative access
+- **"A newer version of OneDrive is installed"** → close OneDrive completely, restart the device, and open OneDrive again. If the message persists → **Route to IT**
+
+---
+
+# Windows
+
+### The device starts to a black screen
+
+1. Confirm the device has power and is plugged in
+2. Confirm any external monitor is connected and powered on
+3. Disconnect external monitors, docks, and unnecessary USB devices
+4. Wait a few seconds and check whether the screen wakes
+5. **Reset the graphics driver:** press **Windows logo key + Ctrl + Shift + B**. A beep or a screen flicker means it worked
+6. **Cycle the display mode:** press **Windows logo key + P**, then tap **P** again and press **Enter** to rotate through the options. This fixes the common case where the machine is still projecting to a monitor or dock that is no longer attached
+7. If a cursor is visible on the black screen, restart Windows Explorer: press **Ctrl + Shift + Esc** to open Task Manager, find **Windows Explorer**, right-click it and select **Restart**
+8. Force a shutdown by holding the power button for **20 seconds**, then power on again
+
+**Caution:** state the 20 seconds explicitly. Holding for around 10 seconds repeatedly is what puts the device into Recovery Mode, which is not wanted here.
+
+**Route to IT if:** the screen is still black. Safe Mode, Recovery, driver rollback and System Restore are all admin-gated.
+
+### A Windows update is stuck or failing
+
+The agent's job in this entry is **data capture, not resolution.** There is no user-safe fix for a genuinely failed update.
+
+1. Record the displayed message, error, or percentage
+2. Ask how long it has remained unchanged. Install time depends on connection speed and update size — if the percentage is still moving, or it is sitting between 51% and 99%, additional waiting is the correct action
+3. Keep the device connected to power
+4. Confirm the device has internet connectivity: **Start** > **Settings** > **Network & Internet** > **Wi-Fi**
+5. Check the error code: **Start** > **Settings** > **Windows Update** > **Update history**. On Windows 10: **Start** > **Settings** > **Update & Security** > **Windows Update**. Failed updates show a code — have the caller read it out
+6. Check free disk space: **Start** > **Settings** > **System** > **Storage**. A feature upgrade needs at least **16 GB** free for a 32-bit OS or **20 GB** for 64-bit
+
+**Route to IT** with the error code. The Windows Update troubleshooter, SFC, DISM, folder renames and antivirus changes are all admin-gated.
+
+### I got a blue screen with an error on it
+
+1. Note the complete error message, code, or stop code shown on the screen
+2. Restart the device
+3. If the error repeats → **Route to IT** with the exact stop code and message
+
+### My files disappeared after a Windows update
+
+1. Search for the missing files: **File Explorer** > **This PC** > search box in the top-right corner, enter the file name
+2. Use an asterisk `*` for partial matches, for example `*.doc` for Word files
+3. Check **OneDrive** if the files were stored there
+4. Check the **Recycle bin**
+5. Show hidden files: **View** tab > **Show hidden files**
+
+**Route to IT if:** files were lost to a corrupted profile, or a system restore or backup recovery is needed.
+
+### This app won't run on Windows 10
+
+1. Confirm the app is designed for Windows 10
+2. Try Compatibility Mode: right-click the app > **Properties** > **Compatibility** > select a previous Windows version > **OK**
+3. Restart the app
+
+**Route to IT if:** the app is unsupported or needs driver updates.
+
+---
+
+# BitLocker
+
+### The device is asking for a BitLocker recovery key
+
+**This entry ends in a WARM TRANSFER. Do not attempt to resolve it on the call.**
+
+1. **Tell the caller not to keep entering keys.** Repeated incorrect entries can make the situation worse. Say this first, before anything else
+2. Ask them to keep the device powered and plugged in
+3. Record the asset tag and/or device name if available
+4. **Record the recovery-key identifier shown on screen — this is the first 8 digits.** It identifies which key applies to this device and is the single most important thing to capture
+5. Ask whether the prompt followed an update, restart, docking change, or hardware change
+6. **WARM TRANSFER to an agent**
+
+**Reassure the caller:** this prompt does not mean the device has been compromised. Windows asks for the recovery key when it cannot automatically unlock the drive, which includes ordinary hardware, firmware or software changes. It can happen to the legitimate owner of the device.
+
+**The agent must never:**
+- Ask the caller to read out a full recovery key. Only the 8-digit identifier
+- Direct the caller to a personal Microsoft account recovery page. This is a work device and the key is held by the organization
+- Mention resetting the device. That is an IT decision and it removes all files
+
+---
+
+# Security
+
+### I received a suspicious Outlook email or Teams message
+
+1. **Tell the caller not to click any links, open attachments, reply, or provide any information**
+2. **Ask whether anything was already clicked, opened, downloaded, or entered.**
+   - **If yes → WARM TRANSFER to an agent immediately.** Do not troubleshoot further, do not ask them to change their password, and do not ask them to run a scan first
+   - If no → continue
+3. For a suspicious **Outlook email**, guide the caller to select the message, then the **Report** button at the top of the message list, then choose from the dropdown:
+   - **Report junk** — reports it, moves it out of the inbox into the Junk Email folder, and blocks that sender
+   - **Report phishing** — reports it and deletes it
+   Use **Report phishing** if the message appears malicious; **Report junk** if it is ordinary spam
+4. Once reported, the call is **RESOLVED ON CALL**
+
+**Important — the Report button is a split button.** Selecting the button itself without opening the dropdown reports the message as phishing. Tell the caller to use the dropdown so they choose deliberately.
+
+**Note on wording:** do not tell the caller that reporting as junk deletes the message. It does not — it moves it to the Junk Email folder and blocks the sender. Only phishing deletes.
+
+**For a suspicious Teams message:** no self-service reporting flow is confirmed for this environment. **WARM TRANSFER to an agent.**
+
+---
+
+# Contact & Escalation
+
+### When to Route to IT
+
+- Any step flagged **Route to IT** in this document
+- Any fix requiring administrator rights or system-level changes
+- Installing, uninstalling, reinstalling, repairing, or updating any app or Windows
+- Running repair tools (Inbox Repair Tool, SFC, DISM, PowerShell)
+- Editing the registry, file security permissions, services, or Group Policy
+- Creating or changing user accounts
+- Safe Mode, Windows Updates, driver updates, BIOS updates
+- Anything gated behind a license or org policy the caller cannot change
+- Any problem whose answer is not in this document
+
+### When to Warm Transfer
+
+- A BitLocker recovery key prompt
+- A suspicious message where the caller has already clicked, downloaded, or entered information
+- A suspicious Teams message
+
+### What to Collect Before Routing
+
+- Caller name and a brief description of the problem and what was already tried
+- The exact error message, status code, or stop code shown on screen, read verbatim
+- For Windows updates: the error code from Update history, and how long the update has been stalled
+- For BitLocker: the 8-digit recovery-key identifier and the device name or asset tag
+- For OneDrive: the specific file name and error message if sync fails
+- For Outlook: whether the issue also occurs in Outlook on the web
+- Confirm whether the issue affects one user, all users, or one device
+
+---
+
+<maintainer_notes>
+NOT FOR THE CALLER. NEVER READ ALOUD. For whoever maintains this document.
+
+Built 29 July 2026 from Compugen's July 2026 scoping guidance plus Microsoft
+support documentation. Full source traceability, per-entry, lives in
+MS_Support_Sources_for_KB.txt.
+
+PRECEDENCE RULE APPLIED: where the Microsoft article documented more than the
+scoping guidance, the article's version was written. Two deliberate exceptions,
+both because the sourced figure would be wrong for this environment:
+  - No mailbox size limit is stated. The source article's 90/100/110 MB
+    thresholds are legacy and wrong for a modern M365 mailbox.
+  - No OneDrive storage tier figures are stated. The sourced tiers describe
+    consumer accounts; these are work/school users.
+Supply the real Compugen figures and both entries can carry a number.
+
+FOUR ITEMS AWAITING CONFIRMATION. Each is written to be correct either way, so
+none blocks use of this document:
+  1. Report button name (Security). Written as "the Report button" with the
+     dropdown described, which holds true for both the built-in Report split
+     button and the older Report Message add-in. Confirm which one this tenant
+     shows and tighten the wording.
+  2. Suspicious Teams message. Currently warm transfer, because no Microsoft
+     end-user reporting flow exists for Teams equivalent to Outlook's. Replace
+     if Compugen has an internal procedure.
+  3. Warm transfer operational detail — target queue, what the agent says
+     during the handoff, and what happens if nobody picks up — is not defined
+     here. It needs to be, before the two warm-transfer entries go live.
+  4. App-password and add-an-account entries were dropped as credential-adjacent
+     under the sign-in removal. Confirm that was intended.
+
+DEPENDENCIES — do not remove these without checking what breaks:
+  - "OneDrive restrictions and limitations" is the source for the character and
+    path limits referenced by three sync entries.
+  - Windows Privacy > Camera lives in the Teams camera entry. The standalone
+    Windows camera entry was removed; this is now the only place that fix
+    exists.
+  - Win+Ctrl+Shift+B lives in the black screen entry. The screen-flickering
+    entry was removed; this is now the only place that shortcut exists.
+</maintainer_notes>
