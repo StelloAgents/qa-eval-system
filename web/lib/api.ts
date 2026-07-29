@@ -20,8 +20,20 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
+/** For endpoints that must return an array. A route that forgets to await a
+ * database call serialises a Promise as `{}` and still returns 200 — the UI
+ * then dies on `.map is not a function`, which points nowhere near the cause.
+ * Failing here turns that into a caught, named error instead. */
+async function getArray<T>(url: string): Promise<T[]> {
+  const data = await getJson<unknown>(url);
+  if (!Array.isArray(data)) {
+    throw new Error(`${url} returned ${typeof data}, expected an array`);
+  }
+  return data as T[];
+}
+
 export const api = {
-  listOrgs: () => getJson<EvalOrg[]>("/api/orgs"),
+  listOrgs: () => getArray<EvalOrg>("/api/orgs"),
   getOrg: (orgId: string) => getJson<EvalOrg>(`/api/orgs/${orgId}`),
   getOrgCases: (orgId: string) => getJson<OrgCases>(`/api/orgs/${orgId}/cases`),
   getGraderPrompt: (orgId: string, caseId: string) =>
@@ -62,10 +74,10 @@ export const api = {
     return (await res.json()) as GraderPrompt;
   },
   listRuns: (orgId: string, limit = 10) =>
-    getJson<EvalRun[]>(`/api/evals/runs/${orgId}?limit=${limit}`),
+    getArray<EvalRun>(`/api/evals/runs/${orgId}?limit=${limit}`),
   getRun: (runId: string) => getJson<RunStatusResponse>(`/api/evals/run/${runId}`),
   getRunResults: (runId: string) =>
-    getJson<EvalResult[]>(`/api/evals/run/${runId}/results`),
+    getArray<EvalResult>(`/api/evals/run/${runId}/results`),
   compare: (runA: string, runB: string) =>
     getJson<CompareResult>(`/api/evals/compare/${runA}/${runB}`),
   startRun: async (orgId: string, tier: RunTier): Promise<{ run_id: string; status: string }> => {

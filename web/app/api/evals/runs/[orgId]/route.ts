@@ -7,5 +7,7 @@ export async function GET(
   { params }: { params: { orgId: string } }
 ) {
   const limit = Number(req.nextUrl.searchParams.get("limit") ?? 10);
-  return NextResponse.json(listRuns(params.orgId, Number.isFinite(limit) ? limit : 10));
+  return NextResponse.json(
+    await listRuns(params.orgId, Number.isFinite(limit) ? limit : 10)
+  );
 }
