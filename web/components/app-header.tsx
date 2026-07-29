@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -40,7 +40,23 @@ export function AppHeader() {
             </Link>
           ))}
         </nav>
+        <SignOut />
       </div>
     </header>
+  );
+}
+
+/** A form post rather than a link, so a prefetch cannot sign anyone out. */
+function SignOut() {
+  return (
+    <form action="/auth/signout" method="post" className="ml-auto">
+      <button
+        type="submit"
+        className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <LogOut className="h-3.5 w-3.5" />
+        Sign out
+      </button>
+    </form>
   );
 }
