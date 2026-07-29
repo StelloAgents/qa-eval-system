@@ -13,6 +13,12 @@ const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/signout"];
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Temporary escape hatch: when AUTH_BYPASS=1 the whole app is open, no sign-in
+  // required. For testing only — it leaves the API (which spends Bland/OpenRouter
+  // credits and writes to a production schema) unauthenticated. Remove the env
+  // var to re-lock; no code change needed.
+  if (process.env.AUTH_BYPASS === "1") return NextResponse.next();
+
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
