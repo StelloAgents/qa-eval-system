@@ -463,3 +463,94 @@ export async function compareRuns(
   }
   return { run_a: runAId, run_b: runBId, new_passes: newPasses, regressions, stable };
 }
+
+// --- KB answer drafts --------------------------------------------------------
+// Generated answers cost money, so they are persisted rather than held in
+// component state. Every call is guarded: until migration 0002 has been run by
+// a privileged role the table does not exist, and the KB Gaps page must still
+// render (just without saved drafts) instead of erroring.
+
+export interface StoredDraft {
+  org_id: string;
+  run_id: string;
+  case_id: string;
+  question: string;
+  status: string;
+  answer: string;
+  source: string;
+  note: string | null;
+  edited_answer: string | null;
+  model: string | null;
+  cost: number;
+}
+
+/** Postgres "relation does not exist". */
+const UNDEFINED_TABLE = "42P01";
+
+export async function listDrafts(orgId: string, runId: string): Promise<StoredDraft[]> {
+  try {
+    return await query<StoredDraft>(
+      `select org_id, run_id, case_id, question, status, answer, source, note,
+              edited_answer, model, cost
+         from qa_eval.kb_drafts
+        where org_id = $1 and run_id = $2`,
+      [orgId, runId]
+    );
+  } catch (e: any) {
+    if (e?.code === UNDEFINED_TABLE) return [];
+    throw e;
+  }
+}
+
+/** Upsert a batch of drafts. Re-drafting a question overwrites the model's
+ * answer but deliberately leaves any human edit alone — losing someone's
+ * rewrite because they pressed the button again would be indefensible.
+ * Returns false when the table is not there yet, so callers can say so. */
+export async function saveDrafts(rows: StoredDraft[]): Promise<boolean> {
+  if (!rows.length) return true;
+  try {
+    for (const r of rows) {
+      await query(
+        `insert into qa_eval.kb_drafts
+           (org_id, run_id, case_id, question, status, answer, source, note, model, cost)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         on conflict (org_id, run_id, case_id) do update set
+           question = excluded.question,
+           status   = excluded.status,
+           answer   = excluded.answer,
+           source   = excluded.source,
+           note     = excluded.note,
+           model    = excluded.model,
+           cost     = excluded.cost,
+           updated_at = now()`,
+        [r.org_id, r.run_id, r.case_id, r.question, r.status, r.answer,
+         r.source, r.note, r.model, r.cost]
+      );
+    }
+    return true;
+  } catch (e: any) {
+    if (e?.code === UNDEFINED_TABLE) return false;
+    throw e;
+  }
+}
+
+/** Persist (or clear, with null) a human edit. */
+export async function saveDraftEdit(
+  orgId: string,
+  runId: string,
+  caseId: string,
+  edited: string | null
+): Promise<boolean> {
+  try {
+    const rows = await query(
+      `update qa_eval.kb_drafts set edited_answer = $4, updated_at = now()
+        where org_id = $1 and run_id = $2 and case_id = $3
+        returning case_id`,
+      [orgId, runId, caseId, edited]
+    );
+    return rows.length > 0;
+  } catch (e: any) {
+    if (e?.code === UNDEFINED_TABLE) return false;
+    throw e;
+  }
+}

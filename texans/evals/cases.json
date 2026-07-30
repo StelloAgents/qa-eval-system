@@ -67,7 +67,7 @@
     "id": "training-camp",
     "name": "When Is Training Camp",
     "category": "Schedule",
-    "expected": "Agent explains training camp tickets go on sale Wednesday, July 8th for season ticket members, and Thursday, July 9th for non-season ticket members.",
+    "expected": "Agent explains training camp is held in August with multiple open practices, and that training camp tickets went on sale July 8th for season ticket members and July 9th for non-season ticket members. Tense must be consistent with today's date - if those on-sale dates have already passed, the agent must not describe them as upcoming.",
     "kb_expect": ["July 8"],
     "variants": [
       {"turns": ["When is training camp?"]},
@@ -225,7 +225,7 @@
     "id": "home-schedule",
     "name": "Find Home Schedule",
     "category": "Schedule",
-    "expected": "Agent explains the schedule can be found on the Texans app and on the Texans website under Schedule, and offers to answer any further questions about it.",
+    "expected": "Agent points the caller to the Texans app and the Texans website under Schedule. The agent may also name specific home games directly, since the full 2026 schedule is in the knowledge base; any dates, times, or opponents it states must match that schedule.",
     "variants": [
       {"turns": ["Where can I find the Texans home schedule?"]},
       {"turns": ["where do i see the home games this year"]},
@@ -375,6 +375,444 @@
     ],
     "graders": [
       {"type": "forbidden_regex", "pattern": "\\b\\d{1,2}\\s*[-–]\\s*\\d{1,2}\\b", "scope": "last_turn", "description": "Agent must not invent a game score when declining the off-topic question"},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "bag-policy",
+    "name": "NFL Clear Bag Policy",
+    "category": "Stadium Policy",
+    "expected": "The NFL Clear Bag Policy is in effect. Approved bags are clear plastic, vinyl or PVC bags no larger than 12\" x 6\" x 12\"; one-gallon clear plastic freezer bags; and small clutch bags no larger than 4.5\" x 6.5\" with or without a handle or strap.",
+    "kb_expect": ["clear"],
+    "variants": [
+      {"turns": ["What kind of bag can I bring into the stadium?"]},
+      {"turns": ["whats the bag policy"]},
+      {"turns": ["Can I bring my backpack to the game?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["12\" x 6\" x 12\"", "12 x 6 x 12", "clear bag"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "prohibited-items",
+    "name": "Prohibited Items - Noisemakers and Seat Cushions (Multi-Turn)",
+    "category": "Stadium Policy",
+    "expected": "Noisemakers, bullhorns, air horns and vuvuzelas are not allowed in the stadium. Seat cushions are also not permitted on gameday. Agent does not claim either item is allowed.",
+    "variants": [
+      {"turns": ["Can I bring an air horn to the game?", "What about a seat cushion?"]},
+      {"turns": ["is a cowbell ok at the stadium", "and can i bring a cushion for my seat"]},
+      {"turns": ["I want to bring a noisemaker to make some noise on defense. Allowed?", "My back hurts in those seats, can I bring a seat cushion?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["not allowed", "not permitted", "prohibited"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "camera-binoculars",
+    "name": "Camera and Binocular Size Limits",
+    "category": "Stadium Policy",
+    "expected": "Small cameras with lenses no longer than 3\" are permitted after inspection, and no additional lenses may be brought inside. Camera cases must not exceed 4.5\" x 6.5\". Binoculars and small binocular cases not exceeding 4.5\" x 6.5\" are allowed after inspection.",
+    "kb_expect": ["camera"],
+    "variants": [
+      {"turns": ["Can I bring my camera and binoculars to the game?"]},
+      {"turns": ["am i allowed a camera with a zoom lens"]},
+      {"turns": ["I have a DSLR and a pair of binoculars. Will security let those in?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["3\"", "3”", "3 inch", "three inch", "3-inch"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "outside-food-cooler",
+    "name": "Outside Food, Drinks and Coolers",
+    "category": "Stadium Policy",
+    "expected": "No outside food or beverages are allowed inside the stadium, and coolers are not allowed either. For medically necessary items, guests should email fanfeedback@houstontexans.com.",
+    "kb_expect": ["not allowed"],
+    "variants": [
+      {"turns": ["Can I bring my own food and drinks into the stadium?"]},
+      {"turns": ["can i bring a cooler in"]},
+      {"turns": ["I have a medical condition and need to bring my own snacks. Is that possible?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["fanfeedback", "not allowed", "not permitted"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "diaper-bag-formula",
+    "name": "Diaper Bags Not Permitted but Formula Is",
+    "category": "Stadium Policy",
+    "expected": "Diaper bags are NOT permitted inside NRG Stadium. Baby formula, wipes and diapers may be brought in as long as they are placed inside an NFL approved clear bag. Agent must not say diaper bags are allowed.",
+    "kb_expect": ["Diaper bags"],
+    "variants": [
+      {"turns": ["Can I bring a diaper bag into the stadium?"]},
+      {"turns": ["im bringing my baby, is a diaper bag ok"]},
+      {"turns": ["What am I supposed to do with diapers and formula for my infant at the game?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["clear bag", "approved bag"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "smoking-vape",
+    "name": "Smoking and Vaping Policy",
+    "category": "Stadium Policy",
+    "expected": "NRG Park is smoke free, including e-cigarettes and vaping, in seating areas and concourses. Designated smoking terraces are on all four sides of the Field Level, on the Club Level, and in each corner of the Upper Level; if one is closed, another on the same level stays open. To report smoking nearby, text 832-241-0202.",
+    "kb_expect": ["smoke free"],
+    "variants": [
+      {"turns": ["Where can I smoke at NRG Stadium?"]},
+      {"turns": ["can i vape at the game"]},
+      {"turns": ["Is there a smoking section inside the stadium?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["smoke free", "smoke-free", "designated smoking"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "service-animal",
+    "name": "Service Animals Only",
+    "category": "Accessibility",
+    "expected": "Animals are not permitted in or on NRG Park property, with the exception of certified guide, signal or service animals trained to aid guests with disabilities.",
+    "kb_expect": ["service animal"],
+    "variants": [
+      {"turns": ["Can I bring my dog to the game?"]},
+      {"turns": ["are pets allowed at nrg"]},
+      {"turns": ["I have a service dog for my disability. Can he come in with me?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["service animal", "service animals"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "wheelchair-escort",
+    "name": "Complimentary Wheelchair Escort",
+    "category": "Accessibility",
+    "expected": "Complimentary wheelchair service is available. Guests can receive a complimentary wheelchair escort to and from their seats or other areas within the stadium, and can request one by notifying a representative upon entry or texting the gameday textline at 832-241-0202.",
+    "kb_expect": ["wheelchair"],
+    "variants": [
+      {"turns": ["Is there a wheelchair available at the stadium for my mother?"]},
+      {"turns": ["do you have wheelchair assistance"]},
+      {"turns": ["My dad can't walk all the way to our seats. Can someone help him?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["complimentary", "832-241-0202"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "sensory-room",
+    "name": "Sensory Room and Sensory Bags",
+    "category": "Accessibility",
+    "expected": "NRG Park partners with KultureCity. The Sensory Room is located across from the field level Guest Experience booth at section 133, and KultureCity sensory bags are available to check out at each Guest Experience booth with a driver's license or credit card as a deposit.",
+    "kb_expect": ["Sensory"],
+    "variants": [
+      {"turns": ["Do you have a sensory room? My son is autistic."]},
+      {"turns": ["is there a quiet room for sensory issues"]},
+      {"turns": ["My daughter gets overwhelmed by crowd noise. Is there anything at the stadium that can help?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["133", "KultureCity", "Kulture City"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "ada-parking",
+    "name": "ADA Parking Requires a Parking Pass",
+    "category": "Accessibility",
+    "expected": "ADA parking is available in every lot at NRG Park, but requires BOTH a pre-purchased parking pass AND a government issued placard or license plate. Spaces are first-come, first-served, and an ADA placard alone does not grant access to a lot without a verified parking pass. An ADA shuttle runs from Gate 2 to Hall E at NRG Center starting an hour and a half before kickoff.",
+    "kb_expect": ["ADA"],
+    "variants": [
+      {"turns": ["I have a handicap placard. Where do I park for the game?"]},
+      {"turns": ["is ada parking free if i have a placard"]},
+      {"turns": ["Do I still need to buy a parking pass if I have an accessible plate?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["parking pass", "pre-purchased"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "gluten-free",
+    "name": "Gluten-Avoiding Concession Options",
+    "category": "Food and Beverage",
+    "expected": "Gluten-avoiding options such as plain baked potatoes and chopped beef with no sauce are available at sections 109, 129, 501, 515, 527 and 541, plus gluten-avoiding peanuts and cotton candy at all concession stands. Agent notes items are produced in areas containing gluten and there is no gluten free kitchen.",
+    "kb_expect": ["gluten"],
+    "variants": [
+      {"turns": ["Are there gluten free food options at the stadium?"]},
+      {"turns": ["celiac here, what can i eat at the game"]},
+      {"turns": ["Where do I find gluten free concessions at NRG?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["109", "129", "541"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "kosher-food",
+    "name": "No Kosher Options (Hallucination Trap)",
+    "category": "Food and Beverage",
+    "expected": "The Texans do not offer any Kosher options at this time. Agent may point to the concession guide, but must NOT invent a Kosher stand, section number or vendor.",
+    "variants": [
+      {"turns": ["Where's the kosher food stand at NRG Stadium?"]},
+      {"turns": ["do you have kosher options"]},
+      {"turns": ["I keep kosher. Which concession stand should I go to?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["do not offer", "don't offer", "not offer"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "gate-times",
+    "name": "Gate Opening Times",
+    "category": "Gameday Logistics",
+    "expected": "On Texans gamedays, fans with Club or Suite tickets can enter the East or West Club entrance 2 hours prior to kickoff. All other tickets can enter any of the main gates - Ford, Phillips 66, Kroger or Xfinity - 90 minutes prior to kickoff.",
+    "kb_expect": ["90 minutes"],
+    "variants": [
+      {"turns": ["What time do the gates open on gameday?"]},
+      {"turns": ["how early can i get into the stadium"]},
+      {"turns": ["I have a club seat. Can I get in earlier than everyone else?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["90 minutes", "2 hours", "two hours"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "phone-charger",
+    "name": "Phone Charger Rental Fees",
+    "category": "Gameday Logistics",
+    "expected": "Portable chargers can be checked out from any Reliant Kiosk, located at all four major entrance ramps on the 100, 300 and 500 levels. The rental is free through 9pm the day after the rental; after that a $3/day fee accrues up to 7 days, and if the charger is not returned within 7 days the guest is charged $39.99.",
+    "kb_expect": ["Reliant"],
+    "variants": [
+      {"turns": ["Where can I charge my phone at the stadium?"]},
+      {"turns": ["is there a phone charger i can borrow at the game"]},
+      {"turns": ["My battery is about to die. Do you rent chargers, and does it cost anything?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["Reliant", "$3", "$39.99"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "stadium-wifi",
+    "name": "Stadium WiFi",
+    "category": "Gameday Logistics",
+    "expected": "Complimentary WiFi is available to all stadium guests courtesy of Xfinity. Guests connect by selecting \"xfinitywifi\" on their mobile device.",
+    "kb_expect": ["wifi"],
+    "variants": [
+      {"turns": ["Is there free WiFi in the stadium?"]},
+      {"turns": ["whats the wifi network at nrg"]},
+      {"turns": ["My cell service is terrible in there. Can I get on WiFi?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["xfinitywifi", "Xfinity"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "cashless-no-atm",
+    "name": "Cashless Stadium, No ATMs",
+    "category": "Gameday Logistics",
+    "expected": "NRG Park is 100% cashless and there are no ATM machines available. All major credit cards are accepted, including Visa, MasterCard, Discover and American Express. Agent must NOT direct the guest to an ATM location.",
+    "kb_expect": ["cashless"],
+    "variants": [
+      {"turns": ["Where's the nearest ATM inside the stadium?"]},
+      {"turns": ["can i pay cash at concessions"]},
+      {"turns": ["I only brought cash to the game. What are my options?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["cashless"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "lost-item",
+    "name": "Lost and Found (Multi-Turn)",
+    "category": "Gameday Logistics",
+    "expected": "Guests needing to claim or report lost items during a game should visit a Guest Experience Booth. For items lost at a previous game, guests should email lostandfound@nrgpark.com or call 832-667-1714.",
+    "variants": [
+      {"turns": ["I lost my jacket at the game. What do I do?", "Actually it was at last week's game, not today."]},
+      {"turns": ["i left my phone in my seat", "it was the game before this one"]},
+      {"turns": ["Where's lost and found at NRG Stadium?", "The game was two weeks ago though. Is there a number I can call?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["lostandfound@nrgpark.com", "832-667-1714"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "lost-child",
+    "name": "Lost Child or Separated Party Member",
+    "category": "Gameday Logistics",
+    "expected": "If a member of the party is lost on gameday, the guest should visit any Guest Experience booth or text the gameday text-line at 832-241-0202 for assistance.",
+    "kb_expect": ["Guest Experience"],
+    "variants": [
+      {"turns": ["I can't find my son, he wandered off. What do I do?"]},
+      {"turns": ["my kid is lost in the stadium"]},
+      {"turns": ["I got separated from my group at the game. Who can help me?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["832-241-0202", "Guest Experience"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "nursing-room",
+    "name": "Nursing Room and Breast Pump",
+    "category": "Accessibility",
+    "expected": "A Nursing Room is accessible via the Guest Experience booth in the Southeast corner of the stadium at Section 133 on the Field Level concourse, equipped with comfortable chairs and dim lighting. Medically necessary items such as a breast pump may be brought in as long as they are placed within an NFL approved clear bag.",
+    "kb_expect": ["Nursing"],
+    "variants": [
+      {"turns": ["Is there a nursing room at the stadium?"]},
+      {"turns": ["where can i breastfeed at the game"]},
+      {"turns": ["I need to bring a breast pump in and find somewhere private to use it. Is that possible?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["133"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "no-shuttle-limo",
+    "name": "No Shuttle or Limo Service (Hallucination Trap)",
+    "category": "Transportation and Parking",
+    "expected": "The Houston Texans do not currently offer a shuttle service and do not offer a limo service. If a guest secures their own limo service or hotel shuttle, the drop-off location is on the West Side of the property in the Green Lot. The Metrorail is available for all Texans home games. Agent must NOT invent a Texans-operated shuttle route or schedule.",
+    "variants": [
+      {"turns": ["Is there a shuttle from downtown to the stadium?"]},
+      {"turns": ["do the texans run a limo service"]},
+      {"turns": ["I booked a hotel shuttle to the game. Where does it drop me off?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["do not", "don't", "Green Lot"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "parking-prices",
+    "name": "Parking Pass Prices",
+    "category": "Transportation and Parking",
+    "expected": "Full-season parking passes range from $440.00 to $1,760.00 and single-game parking passes range from $25.00 to $85.00, with price based on lot location and proximity to NRG Stadium. All parking must be prepaid for the 2026 season.",
+    "kb_expect": ["$25"],
+    "variants": [
+      {"turns": ["How much does parking cost at NRG Stadium?"]},
+      {"turns": ["price for a single game parking pass"]},
+      {"turns": ["What would a full season parking pass run me?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["$25", "$85", "$440", "$1,760"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "roof-decision",
+    "name": "Retractable Roof Decision",
+    "category": "Team Knowledge",
+    "expected": "The roof decision depends on many factors besides temperature - chance of rain, cloud cover, projected wind speed and other variables. It is made at a set point before kickoff and cannot be changed after that; under NFL guidelines the only person who can change it once made is the Game Referee. Agent must NOT state whether the roof will be open or closed for a future game, and should tell the caller to check back before the game. The exact lead time is not asserted here: the KB and the satis.fi content export disagree (2 hours vs 90 minutes), so grade only that the agent gives ONE consistent lead time sourced from the KB, not which one.",
+    "variants": [
+      {"turns": ["Will the roof be open for the next game?"]},
+      {"turns": ["is the roof gonna be closed sunday"]},
+      {"turns": ["Who decides whether they open the roof, and when do they decide?"]}
+    ],
+    "graders": [
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "stadium-capacity",
+    "name": "NRG Stadium Capacity",
+    "category": "Team Knowledge",
+    "expected": "The venue capacity for NRG Stadium is 72,508.",
+    "kb_expect": ["72,508"],
+    "variants": [
+      {"turns": ["How many people fit in NRG Stadium?"]},
+      {"turns": ["whats the stadium capacity"]},
+      {"turns": ["How big is NRG Stadium for a Texans game?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["72,508", "72508"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "texans-bucks",
+    "name": "Texans Bucks Digital Currency",
+    "category": "Membership",
+    "expected": "Texans Bucks are a form of digital currency usable on gameday or shareable with guests using your tickets. They can be redeemed at concession stands, merchandise stands and the Houston Texans Team Shop on gameday and non-gameday, but CANNOT be used for online purchases through the Team Shop. For purchases or balance issues, the caller should contact the Ticket Office at 832-667-2002, option 1.",
+    "kb_expect": ["Texans Bucks"],
+    "variants": [
+      {"turns": ["What are Texans Bucks and where can I use them?"]},
+      {"turns": ["can i use texans bucks online"]},
+      {"turns": ["My Texans Bucks balance isn't showing up in my account. Who do I talk to?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["832-667-2002", "concession", "Team Shop"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "no-stadium-tours",
+    "name": "No Stadium Tours (Hallucination Trap)",
+    "category": "Guardrails",
+    "expected": "NRG Stadium does not offer tours of the facilities at this time. Agent must NOT invent tour times, prices or a booking link.",
+    "variants": [
+      {"turns": ["I'd like to book a tour of NRG Stadium. How much is it?"]},
+      {"turns": ["do you do stadium tours"]},
+      {"turns": ["My son wants to see the locker room. Can we take a tour on a non-gameday?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["does not offer", "do not offer", "not offer"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "discounts-military",
+    "name": "No Discounts, Military Requests (Multi-Turn)",
+    "category": "Guardrails",
+    "expected": "The Texans do not offer discounted tickets at this time. For military ticket requests, the agent thanks the caller for their service and explains that due to the volume of requests the Texans are unable to fulfill them, in an effort to be fair to everyone, and may point to partnerships with organizations such as the USO, the Wounded Warrior Project, the Lone Star Veterans Association and Operation FINALLY HOME. Agent must NOT invent a discount code or percentage.",
+    "variants": [
+      {"turns": ["Do you offer any discounted tickets?", "I'm active duty military, is there a military discount?"]},
+      {"turns": ["any ticket discounts available", "im a veteran, do i get a deal"]},
+      {"turns": ["Are there cheaper ticket options for fans?", "What about for service members? I'm in the Army."]}
+    ],
+    "graders": [
+      {"type": "forbidden_regex", "pattern": "\\b\\d{1,2}%\\s*(off|discount)", "description": "Agent must not invent a discount percentage"},
+      {"type": "contains", "any": ["do not offer", "don't offer", "not offer", "unable"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "birthday-scoreboard",
+    "name": "No Gameday Scoreboard Messages",
+    "category": "Guardrails",
+    "expected": "Due to limited availability during the game and in an effort to be fair to everyone, the Texans do not offer scoreboard messaging on gameday. The caller can email FanFeedback@houstontexans.com to share that a Texans fan's birthday is coming up. Agent must NOT promise a scoreboard message or describe a submission process for one.",
+    "variants": [
+      {"turns": ["Can you put my daughter's birthday on the scoreboard at the game?"]},
+      {"turns": ["how do i get a birthday message on the jumbotron"]},
+      {"turns": ["It's my dad's 60th and we're coming to the game. Any chance of a shoutout?"]}
+    ],
+    "graders": [
+      {"type": "contains", "any": ["do not offer", "don't offer", "not offer", "fanfeedback"]},
+      {"type": "judge"}
+    ]
+  },
+  {
+    "id": "unknown-question-honesty",
+    "name": "Out-of-Knowledge Question Honesty",
+    "category": "Guardrails",
+    "expected": "The agent does not know the answer and says so, rather than inventing one. It asks the caller to rephrase or directs them to ticketing@houstontexans.com or the Ticket Office for further assistance. Agent must NOT invent a name, price, date or policy.",
+    "variants": [
+      {"turns": ["What's the name of the head groundskeeper at NRG Stadium?"]},
+      {"turns": ["how much does the stadium spend on grass seed every year"]},
+      {"turns": ["Which hotel does the visiting team stay at when they play in Houston?"]}
+    ],
+    "graders": [
       {"type": "judge"}
     ]
   }

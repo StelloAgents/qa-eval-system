@@ -1,15 +1,18 @@
 import {
   CompareResult,
+  CostSummary,
+  DraftEstimate,
+  DraftResponse,
+  EstimateResponse,
   EvalOrg,
   EvalResult,
-  CostSummary,
-  EstimateResponse,
   EvalRun,
   GraderPrompt,
   ModelCatalogue,
   OrgCases,
   RunStatusResponse,
   RunTier,
+  UnansweredResponse,
 } from "./types";
 
 // Thin client over the Next.js API routes. The routes mirror SPEC.md §API
@@ -81,16 +84,72 @@ export const api = {
     getArray<EvalResult>(`/api/evals/run/${runId}/results`),
   compare: (runA: string, runB: string) =>
     getJson<CompareResult>(`/api/evals/compare/${runA}/${runB}`),
+  unanswered: (orgId: string, runId?: string) =>
+    getJson<UnansweredResponse>(
+      `/api/evals/unanswered?org=${encodeURIComponent(orgId)}` +
+        (runId ? `&run=${encodeURIComponent(runId)}` : "")
+    ),
+  draftAnswers: async (
+    orgId: string,
+    items: { case_id: string; question: string; expected?: string | null }[],
+    runId?: string
+  ): Promise<DraftResponse> => {
+    const res = await fetch("/api/evals/draft", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ org_id: orgId, items, run_id: runId }),
+    });
+    if (!res.ok) throw new Error(`draft → ${res.status}`);
+    return res.json();
+  },
+  draftEstimate: async (
+    orgId: string,
+    items: { case_id: string; question: string; expected?: string | null }[]
+  ): Promise<DraftEstimate> => {
+    const res = await fetch("/api/evals/draft", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ org_id: orgId, items, dry_run: true }),
+    });
+    if (!res.ok) throw new Error(`draft estimate → ${res.status}`);
+    return res.json();
+  },
+  saveDraftEdit: async (
+    orgId: string,
+    runId: string,
+    caseId: string,
+    editedAnswer: string | null
+  ): Promise<{ saved: boolean }> => {
+    const res = await fetch("/api/evals/draft/edit", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        org_id: orgId,
+        run_id: runId,
+        case_id: caseId,
+        edited_answer: editedAnswer,
+      }),
+    });
+    if (!res.ok) throw new Error(`save edit → ${res.status}`);
+    return res.json();
+  },
   estimate: async (
     orgId: string,
     tier: RunTier,
     maxTurns: number,
-    caseIds: string[]
+    caseIds: string[],
+    variantNums?: number[]
   ): Promise<EstimateResponse> => {
     const res = await fetch("/api/evals/estimate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ org_id: orgId, tier, max_turns: maxTurns, case_ids: caseIds }),
+      body: JSON.stringify({
+        org_id: orgId,
+        tier,
+        max_turns: maxTurns,
+        case_ids: caseIds,
+        variant_nums: variantNums,
+      }),
     });
     if (!res.ok) throw new Error(`estimate → ${res.status}`);
     return res.json();
@@ -99,7 +158,8 @@ export const api = {
     orgId: string,
     tier: RunTier,
     maxTurns?: number,
-    caseIds?: string[]
+    caseIds?: string[],
+    variantNums?: number[]
   ): Promise<{ run_id: string; status: string }> => {
     const res = await fetch("/api/evals/run", {
       method: "POST",
@@ -109,6 +169,7 @@ export const api = {
         tier,
         max_turns: maxTurns,
         case_ids: caseIds,
+        variant_nums: variantNums,
       }),
     });
     if (!res.ok) throw new Error(`start run → ${res.status}`);

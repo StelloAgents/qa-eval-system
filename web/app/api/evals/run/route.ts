@@ -48,6 +48,22 @@ export async function POST(req: NextRequest) {
     }
     caseIds = body.case_ids as string[];
   }
+  // Optional: run only these phrasings, as 1-based variant numbers matching the
+  // v1/v2/v3 labels. Absent/empty runs every phrasing.
+  let variantNums: number[] | undefined;
+  if (body?.variant_nums != null) {
+    const v = body.variant_nums;
+    if (
+      !Array.isArray(v) ||
+      v.some((n: unknown) => !Number.isInteger(n) || (n as number) < 1 || (n as number) > 20)
+    ) {
+      return NextResponse.json(
+        { error: "variant_nums must be an array of integers between 1 and 20" },
+        { status: 400 }
+      );
+    }
+    variantNums = v as number[];
+  }
   const org = await getOrg(orgId);
   if (!org) return NextResponse.json({ error: "unknown org" }, { status: 404 });
   if (!org.is_active) {
@@ -69,6 +85,6 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
-  const runId = await startRun(orgId, tier, maxTurns, caseIds);
+  const runId = await startRun(orgId, tier, maxTurns, caseIds, variantNums);
   return NextResponse.json({ run_id: runId, status: "queued" });
 }

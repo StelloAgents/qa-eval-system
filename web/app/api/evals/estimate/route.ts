@@ -33,6 +33,11 @@ export async function POST(req: NextRequest) {
     ? Math.max(0, Math.min(20, body.max_turns))
     : 6;
   const caseIds: string[] | null = Array.isArray(body?.case_ids) ? body.case_ids : null;
+  // 1-based variant numbers; null/empty estimates every phrasing. Mirrors the
+  // runner's filter so the quoted cost matches the run that will actually go out.
+  const variantNums: number[] | null =
+    Array.isArray(body?.variant_nums) && body.variant_nums.length ? body.variant_nums : null;
+  const variantWanted = variantNums ? new Set(variantNums) : null;
 
   if (!orgId) return NextResponse.json({ error: "org_id required" }, { status: 400 });
   const org = await getOrg(orgId);
@@ -62,9 +67,13 @@ export async function POST(req: NextRequest) {
   if (runsPathway) {
     for (const c of cases) {
       if (c.untestable?.tier === "pathway") continue;
-      selectedCases++;
       const template = (await getGraderPrompt(orgId, c.id)) ?? DEFAULT_JUDGE_TEMPLATE;
-      for (const variant of c.variants) {
+      const picked = c.variants.filter((_, i) => !variantWanted || variantWanted.has(i + 1));
+      // A case whose phrasings were all filtered out contributes nothing, so it
+      // must not be counted as selected.
+      if (!picked.length) continue;
+      selectedCases++;
+      for (const variant of picked) {
         variants++;
         // Reconstruct the transcript pathwaySim would build: opener + up to
         // maxTurns follow-ups. Upper bound — real conversations stop early once

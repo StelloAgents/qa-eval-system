@@ -110,7 +110,83 @@ export interface Exchange {
   node?: string | null;
 }
 
-export type NoteType = "advisory" | "hard_gate" | "judge" | "error";
+export type NoteType = "advisory" | "hard_gate" | "judge" | "error" | "unanswered";
+
+/** A question the KB tier asked and got a refusal for. */
+export interface UnansweredItem {
+  case_id: string;
+  case_name: string;
+  category: string;
+  question: string;
+  /** What the KB actually replied — the refusal wording. */
+  kb_reply: string;
+  expected: string | null;
+  kb_expect: string[] | null;
+}
+
+export interface UnansweredRun {
+  run_id: string;
+  created_at: string;
+  run_tier: RunTier;
+  /** Unanswered KB questions in that run. */
+  unanswered: number;
+  /** How many of those already have a saved draft. */
+  drafted: number;
+}
+
+export interface UnansweredResponse {
+  org_id: string;
+  /** Run the list came from, or null when the org has no completed KB run. */
+  run_id: string | null;
+  items: UnansweredItem[];
+  /** KB-tier questions in the same run that DID get an answer. */
+  answered: number;
+  /** Previously generated drafts for this run, keyed by case id. */
+  drafts: Record<string, DraftAnswer>;
+  /** Total already spent drafting for this run. */
+  spent: number;
+  /** Recent KB runs, so the page can switch between them. */
+  runs: UnansweredRun[];
+}
+
+/** `drafted` — grounded and the citation was verified against the KB file.
+ *  `unverified` — the model returned a quote that is not in the file.
+ *  `no_source` — the KB genuinely lacks this answer; a human must write it.
+ *  `error` — the drafting call failed. */
+export type DraftStatus = "drafted" | "unverified" | "no_source" | "error";
+
+export interface DraftAnswer {
+  case_id: string;
+  status: DraftStatus;
+  answer: string;
+  source: string;
+  note: string | null;
+  /** The human's wording, when they have edited this draft. */
+  edited_answer?: string | null;
+}
+
+export interface DraftEstimate {
+  org_id: string;
+  kb_file: string;
+  model: string;
+  questions: number;
+  est_prompt_tokens: number;
+  est_completion_tokens: number;
+  /** Estimated USD, or null when the model has no pricing in the catalogue. */
+  est_cost: number | null;
+}
+
+export interface DraftResponse {
+  org_id: string;
+  /** KB document the drafts were grounded in. */
+  kb_file: string;
+  model: string;
+  cost: number;
+  /** False when migration 0002 has not been applied — drafts were generated but
+   * could not be saved, so they will not survive a reload. */
+  persisted: boolean;
+  drafts: DraftAnswer[];
+}
 
 export interface ResultNote {
   type: NoteType;

@@ -1,5 +1,5 @@
-// Copies every <org>/evals/cases.json from the repo root into web/evals/ so the
-// files exist inside the deployment.
+// Copies every <org>/evals/cases.json into web/evals/ and every <org>/kb/*.md
+// into web/kb/<org>/ so both exist inside the deployment.
 //
 // Vercel's Root Directory is `web`, so anything above it is present at build
 // time but absent at runtime — the runner would throw "no test cases found" on
@@ -13,6 +13,7 @@ import path from "node:path";
 
 const repoRoot = path.resolve(process.cwd(), "..");
 const outDir = path.resolve(process.cwd(), "evals");
+const kbOutDir = path.resolve(process.cwd(), "kb");
 
 const orgs = fs
   .readdirSync(repoRoot, { withFileTypes: true })
@@ -21,6 +22,7 @@ const orgs = fs
   .map((d) => d.name);
 
 fs.rmSync(outDir, { recursive: true, force: true });
+fs.rmSync(kbOutDir, { recursive: true, force: true });
 
 let total = 0;
 for (const org of orgs) {
@@ -42,3 +44,27 @@ if (orgs.length === 0) {
   throw new Error("no <org>/evals/cases.json found at the repo root");
 }
 console.log(`collect-cases: ${orgs.length} orgs, ${total} cases → web/evals/`);
+
+// Knowledge base documents, used by /api/evals/draft to ground answers. Absent
+// for an org that has no kb/ directory, which is fine — that org simply cannot
+// draft, and the route returns a 404 saying so rather than failing the build.
+let kbFiles = 0;
+for (const org of fs.readdirSync(repoRoot, { withFileTypes: true })) {
+  if (!org.isDirectory() || org.name.startsWith(".")) continue;
+  const srcDir = path.join(repoRoot, org.name, "kb");
+  if (!fs.existsSync(srcDir)) continue;
+  const docs = fs.readdirSync(srcDir).filter((f) => f.endsWith(".md"));
+  if (!docs.length) continue;
+  const destDir = path.join(kbOutDir, org.name);
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const f of docs) {
+    fs.copyFileSync(path.join(srcDir, f), path.join(destDir, f));
+    // Preserve mtime: the draft route picks the newest .md, and a plain copy
+    // would stamp every file with the build time and make that choice random.
+    const { atime, mtime } = fs.statSync(path.join(srcDir, f));
+    fs.utimesSync(path.join(destDir, f), atime, mtime);
+    kbFiles++;
+  }
+  console.log(`  collected ${org.name}: ${docs.length} KB document(s)`);
+}
+console.log(`collect-cases: ${kbFiles} KB document(s) → web/kb/`);

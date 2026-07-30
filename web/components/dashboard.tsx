@@ -77,6 +77,9 @@ export function Dashboard() {
   // Max caller-simulator follow-up turns for the pathway tier. 0 = single-turn
   // baseline; higher lets a multi-turn troubleshooting agent finish its flow.
   const [maxTurns, setMaxTurns] = React.useState(6);
+  // Phrasing scope: "all" runs every variant of each case, or a single 1-based
+  // variant number runs just that phrasing (the cheap way to re-check a fix).
+  const [variantSel, setVariantSel] = React.useState<string>("all");
   // Case scope: which cases this run covers. Defaults to all once loaded.
   const [cases, setCases] = React.useState<TestCaseSummary[] | null>(null);
   const [selectedCases, setSelectedCases] = React.useState<Set<string>>(new Set());
@@ -88,6 +91,24 @@ export function Dashboard() {
   const [live, setLive] = React.useState<RunStatusResponse | null>(null);
 
   const org = orgs.find((o) => o.org_id === orgId);
+
+  // Most phrasings any in-scope case has, so the picker only offers variant
+  // numbers that exist somewhere in the current selection.
+  const maxVariants = React.useMemo(
+    () =>
+      (cases ?? [])
+        .filter((c) => selectedCases.has(c.id))
+        .reduce((m, c) => Math.max(m, c.variants.length), 0),
+    [cases, selectedCases]
+  );
+  // Narrowing the case selection can strand a variant number that no longer
+  // exists; fall back to all rather than silently running nothing.
+  React.useEffect(() => {
+    if (variantSel !== "all" && maxVariants && Number(variantSel) > maxVariants) {
+      setVariantSel("all");
+    }
+  }, [maxVariants, variantSel]);
+  const variantNums = variantSel === "all" ? undefined : [Number(variantSel)];
 
   // --- data loading -------------------------------------------------------
   const loadHistory = React.useCallback(async () => {
@@ -158,12 +179,12 @@ export function Dashboard() {
     setEstimate(null);
     const t = setTimeout(() => {
       api
-        .estimate(orgId, tier, maxTurns, ids)
+        .estimate(orgId, tier, maxTurns, ids, variantNums)
         .then(setEstimate)
         .catch(() => setEstimate(null));
     }, 350);
     return () => clearTimeout(t);
-  }, [orgId, tier, maxTurns, selectedCases, cases]);
+  }, [orgId, tier, maxTurns, selectedCases, cases, variantSel]);
 
   // --- run trigger + polling ----------------------------------------------
   async function startRun() {
@@ -171,7 +192,7 @@ export function Dashboard() {
       // Send ids only when it's a real subset; all-selected runs the whole suite.
       const ids = [...selectedCases];
       const scope = cases && ids.length === cases.length ? undefined : ids;
-      const { run_id } = await api.startRun(orgId, tier, maxTurns, scope);
+      const { run_id } = await api.startRun(orgId, tier, maxTurns, scope, variantNums);
       setLive({
         run_id,
         status: "queued",
@@ -291,6 +312,30 @@ export function Dashboard() {
               title="Max caller-simulator follow-up turns per pathway case. 0 = single turn (send only the opening line)."
               className="w-[90px]"
             />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Phrasing
+            </label>
+            <Select
+              value={variantSel}
+              onValueChange={setVariantSel}
+              // The KB tier runs one retrieval check per case regardless of the
+              // phrasing picked, so the control would have no effect there.
+              disabled={!!running || tier === "kb" || !maxVariants}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All phrasings</SelectItem>
+                {Array.from({ length: maxVariants }, (_, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    v{i + 1} only
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

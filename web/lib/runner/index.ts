@@ -21,6 +21,18 @@ import { pathwaySim } from "./sim";
 // Bland trips Cloudflare's rate gate (429 / "error code: 1015") at 6+ workers.
 const WORKERS = 4;
 
+/** Wordings Bland returns when retrieval found nothing and the gap evaluator
+ * came back `answerable: false`. Distinguishing this from "answered, but the
+ * assertion missed" matters: a refusal means the fact never reached the agent,
+ * which is a retrieval or coverage defect, while a wrong answer is a content
+ * defect. They need opposite fixes, so they must not be one bucket. */
+const KB_REFUSAL =
+  /no answer was found|<no relevant information found>|don'?t have (the )?information/i;
+
+export function isKbRefusal(answer: string): boolean {
+  return KB_REFUSAL.test(answer ?? "");
+}
+
 export function loadCases(orgId: string): TestCase[] {
   // Two locations, in this order:
   //   1. <repo>/<org>/evals/cases.json — the source of truth, used in local
@@ -58,7 +70,9 @@ export async function startRun(
   tier: RunTier,
   maxTurns: number = DEFAULT_MAX_TURNS,
   /** Case ids to run; empty/undefined runs the org's whole suite. */
-  caseIds?: string[]
+  caseIds?: string[],
+  /** 1-based variant numbers to run; empty/undefined runs every phrasing. */
+  variantNums?: number[]
 ): Promise<string> {
   const runId = crypto.randomUUID();
   await createRun({
@@ -76,7 +90,7 @@ export async function startRun(
     // model setting is changed later.
     judge_model: (await getJudgeModel(orgId)) ?? DEFAULT_JUDGE_MODEL,
   });
-  const work = executeRun(runId, orgId, tier, maxTurns, caseIds).catch(async (e) => {
+  const work = executeRun(runId, orgId, tier, maxTurns, caseIds, variantNums).catch(async (e) => {
     await setRunStatus(runId, "failed", {
       completed_at: new Date().toISOString(),
       error_message: String(e?.message ?? e),
@@ -102,7 +116,8 @@ async function executeRun(
   orgId: string,
   tier: RunTier,
   maxTurns: number,
-  caseIds?: string[]
+  caseIds?: string[],
+  variantNums?: number[]
 ) {
   const org = await getOrg(orgId);
   if (!org) throw new Error(`unknown org ${orgId}`);
@@ -124,11 +139,19 @@ async function executeRun(
   // leaving them in parks a permanent false FAIL that masks real regressions.
   const testable = selected.filter((c) => c.untestable?.tier !== tier);
 
+  // Restrict to the picked phrasings when a selection was passed. Numbers are
+  // 1-based to match the v1/v2/v3 labels shown in the UI and results table. A
+  // case with fewer variants than the picked number simply contributes no
+  // pathway job -- it is skipped, not failed.
+  const variantWanted = variantNums && variantNums.length ? new Set(variantNums) : null;
+
   const pathwayJobs: { c: TestCase; variantIdx: number }[] = [];
   const kbJobs: TestCase[] = [];
   if (tier !== "kb") {
     for (const c of testable) {
-      c.variants.forEach((_, i) => pathwayJobs.push({ c, variantIdx: i }));
+      c.variants.forEach((_, i) => {
+        if (!variantWanted || variantWanted.has(i + 1)) pathwayJobs.push({ c, variantIdx: i });
+      });
     }
   }
   if (tier !== "pathway") {
@@ -157,7 +180,15 @@ async function executeRun(
 
   await Promise.all([
     workerPool(kbJobs, WORKERS, async (c) => {
-      const question = c.variants[0].turns[c.variants[0].turns.length - 1];
+      // The KB tier is one retrieval check per case, so it always runs even when
+      // the picked phrasing does not exist on this case -- it just falls back to
+      // the first variant rather than dropping the case's KB coverage.
+      const pickedIdx = variantWanted
+        ? c.variants.findIndex((_, i) => variantWanted.has(i + 1))
+        : 0;
+      const kbIdx = pickedIdx >= 0 ? pickedIdx : 0;
+      const kbVariant = c.variants[kbIdx];
+      const question = kbVariant.turns[kbVariant.turns.length - 1];
       try {
         const ans = await kbChat(org.bland_kb_id!, question, blandKey);
         const miss = (c.kb_expect ?? []).filter(
@@ -165,21 +196,31 @@ async function executeRun(
         );
         await save({
           ...base(c),
-          variant_num: 1,
+          variant_num: kbIdx + 1,
           tier: "kb",
           question,
           answer: ans,
           passed: miss.length === 0,
-          notes: miss.length
-            ? [{ type: "advisory", message: `missing ${JSON.stringify(miss)}` }]
-            : [],
+          notes: [
+            ...(isKbRefusal(ans)
+              ? [
+                  {
+                    type: "unanswered" as const,
+                    message: "KB returned no answer — retrieval surfaced nothing",
+                  },
+                ]
+              : []),
+            ...(miss.length
+              ? [{ type: "advisory" as const, message: `missing ${JSON.stringify(miss)}` }]
+              : []),
+          ],
           chat_id: null,
           exchanges: [],
         });
       } catch (e: any) {
         await save({
           ...base(c),
-          variant_num: 1,
+          variant_num: kbIdx + 1,
           tier: "kb",
           question,
           answer: "",

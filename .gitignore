@@ -52,6 +52,13 @@ web/data/
 # Build-time copies of <org>/evals/cases.json (see web/scripts/collect-cases.mjs).
 # The repo-root files remain the source of truth.
 web/evals/
+# Build-time copies of <org>/kb/*.md (see web/scripts/collect-cases.mjs).
+# The repo-root files remain the source of truth.
+web/kb/
+
+# Supabase CLI link state (project ref + local config).
+supabase/.temp/
+
 # root Python ignore has a bare `lib/` pattern; the web app's lib/ is source
 !web/lib/
 .vercel
